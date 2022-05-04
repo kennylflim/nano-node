@@ -548,10 +548,10 @@ std::shared_ptr<nano::block> nano::bulk_pull_server::get_next ()
 		result = connection->node->block (current);
 		if (result != nullptr && set_current_to_end == false)
 		{
-			auto previous (result->previous ());
-			if (!previous.is_zero ())
+			auto next = result->previous ();
+			if (!next.is_zero ())
 			{
-				current = previous;
+				current = next;
 			}
 			else
 			{
