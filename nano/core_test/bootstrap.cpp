@@ -107,14 +107,14 @@ TEST (bulk_pull, ascending_one)
 	auto & node = *system.nodes[0];
 	nano::state_block_builder builder;
 	auto block1 = builder
-			  .account (nano::dev::genesis_key.pub)
-			  .previous (nano::dev::genesis->hash ())
-			  .representative (nano::dev::genesis_key.pub)
-			  .balance (nano::dev::constants.genesis_amount - 100)
-			  .link (nano::dev::genesis_key.pub)
-			  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
-			  .work (0)
-			  .build_shared ();
+				  .account (nano::dev::genesis_key.pub)
+				  .previous (nano::dev::genesis->hash ())
+				  .representative (nano::dev::genesis_key.pub)
+				  .balance (nano::dev::constants.genesis_amount - 100)
+				  .link (nano::dev::genesis_key.pub)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ();
 	node.work_generate_blocking (*block1);
 	ASSERT_EQ (nano::process_result::progress, node.process (*block1).code);
 	auto socket = std::make_shared<nano::socket> (node, nano::socket::endpoint_type_t::server);
@@ -137,14 +137,14 @@ TEST (bulk_pull, ascending_two)
 	auto & node = *system.nodes[0];
 	nano::state_block_builder builder;
 	auto block1 = builder
-			  .account (nano::dev::genesis_key.pub)
-			  .previous (nano::dev::genesis->hash ())
-			  .representative (nano::dev::genesis_key.pub)
-			  .balance (nano::dev::constants.genesis_amount - 100)
-			  .link (nano::dev::genesis_key.pub)
-			  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
-			  .work (0)
-			  .build_shared ();
+				  .account (nano::dev::genesis_key.pub)
+				  .previous (nano::dev::genesis->hash ())
+				  .representative (nano::dev::genesis_key.pub)
+				  .balance (nano::dev::constants.genesis_amount - 100)
+				  .link (nano::dev::genesis_key.pub)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ();
 	node.work_generate_blocking (*block1);
 	ASSERT_EQ (nano::process_result::progress, node.process (*block1).code);
 	auto socket = std::make_shared<nano::socket> (node, nano::socket::endpoint_type_t::server);
@@ -170,14 +170,14 @@ TEST (bulk_pull, ascending_one_account)
 	auto & node = *system.nodes[0];
 	nano::state_block_builder builder;
 	auto block1 = builder
-			  .account (nano::dev::genesis_key.pub)
-			  .previous (nano::dev::genesis->hash ())
-			  .representative (nano::dev::genesis_key.pub)
-			  .balance (nano::dev::constants.genesis_amount - 100)
-			  .link (nano::dev::genesis_key.pub)
-			  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
-			  .work (0)
-			  .build_shared ();
+				  .account (nano::dev::genesis_key.pub)
+				  .previous (nano::dev::genesis->hash ())
+				  .representative (nano::dev::genesis_key.pub)
+				  .balance (nano::dev::constants.genesis_amount - 100)
+				  .link (nano::dev::genesis_key.pub)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ();
 	node.work_generate_blocking (*block1);
 	ASSERT_EQ (nano::process_result::progress, node.process (*block1).code);
 	auto socket = std::make_shared<nano::socket> (node, nano::socket::endpoint_type_t::server);
@@ -200,14 +200,14 @@ TEST (bulk_pull, ascending_two_account)
 	auto & node = *system.nodes[0];
 	nano::state_block_builder builder;
 	auto block1 = builder
-			  .account (nano::dev::genesis_key.pub)
-			  .previous (nano::dev::genesis->hash ())
-			  .representative (nano::dev::genesis_key.pub)
-			  .balance (nano::dev::constants.genesis_amount - 100)
-			  .link (nano::dev::genesis_key.pub)
-			  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
-			  .work (0)
-			  .build_shared ();
+				  .account (nano::dev::genesis_key.pub)
+				  .previous (nano::dev::genesis->hash ())
+				  .representative (nano::dev::genesis_key.pub)
+				  .balance (nano::dev::constants.genesis_amount - 100)
+				  .link (nano::dev::genesis_key.pub)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ();
 	node.work_generate_blocking (*block1);
 	ASSERT_EQ (nano::process_result::progress, node.process (*block1).code);
 	auto socket = std::make_shared<nano::socket> (node, nano::socket::endpoint_type_t::server);
