@@ -218,3 +218,21 @@ TEST (message, message_header_to_string)
 	std::string header_string = keepalive_msg.header.to_string ();
 	ASSERT_EQ (expected_str, header_string);
 }
+
+TEST (message, bulk_pull_serialization)
+{
+	nano::bulk_pull message_in{ nano::dev::network_params.network };
+	message_in.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
+	std::vector<uint8_t> bytes;
+	{
+		nano::vectorstream stream{ bytes };
+		message_in.serialize (stream);
+	}
+	nano::bufferstream stream{ bytes.data (), bytes.size () };
+	bool error = false;
+	nano::message_header header{ error, stream };
+	ASSERT_FALSE (error);
+	nano::bulk_pull message_out{ error, stream, header };
+	ASSERT_FALSE (error);
+	ASSERT_TRUE (header.bulk_pull_ascending ());
+}
