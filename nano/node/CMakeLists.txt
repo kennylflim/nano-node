@@ -18,6 +18,8 @@ add_library(
   active_transactions.cpp
   blockprocessor.hpp
   blockprocessor.cpp
+  bootstrap/bootstrap_ascending.hpp
+  bootstrap/bootstrap_ascending.cpp
   bootstrap/bootstrap_attempt.hpp
   bootstrap/bootstrap_attempt.cpp
   bootstrap/bootstrap_bulk_pull.hpp
