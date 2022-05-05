@@ -452,7 +452,7 @@ void nano::bulk_pull_server::set_current_end ()
 		}
 		else
 		{
-			current = info.head;
+			current = ascending () ? info.open_block : info.head;
 			if (!request->end.is_zero ())
 			{
 				auto account (connection->node->ledger.account (transaction, request->end));
