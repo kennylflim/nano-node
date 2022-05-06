@@ -1,5 +1,5 @@
-#include <nano/node/bootstrap/bootstrap.hpp>
 #include <nano/node/bootstrap/block_deserializer.hpp>
+#include <nano/node/bootstrap/bootstrap.hpp>
 #include <nano/node/bootstrap/bootstrap_bulk_pull.hpp>
 #include <nano/node/bootstrap/bootstrap_connections.hpp>
 #include <nano/node/bootstrap/bootstrap_lazy.hpp>
@@ -26,7 +26,7 @@ nano::bulk_pull_client::bulk_pull_client (std::shared_ptr<nano::bootstrap_client
 	pull (pull_a),
 	pull_blocks (0),
 	unexpected_count (0),
-	block_deserializer{ std::make_shared<nano::bootstrap::block_deserializer> ()}
+	block_deserializer{ std::make_shared<nano::bootstrap::block_deserializer> () }
 {
 	attempt->condition.notify_all ();
 }
@@ -123,7 +123,7 @@ void nano::bulk_pull_client::throttled_receive_block ()
 
 void nano::bulk_pull_client::receive_block ()
 {
-	block_deserializer->read (connection->socket, [this_l = shared_from_this ()] (std::shared_ptr<nano::block> block) { this_l->received_block (block); } );
+	block_deserializer->read (connection->socket, [this_l = shared_from_this ()] (std::shared_ptr<nano::block> block) { this_l->received_block (block); });
 }
 
 void nano::bulk_pull_client::received_block (std::shared_ptr<nano::block> block)
@@ -208,8 +208,6 @@ void nano::bulk_pull_client::received_block (std::shared_ptr<nano::block> block)
 		connection->node->stats.inc_detail_only (nano::stat::type::error, nano::stat::detail::insufficient_work);
 	}
 }
-
-
 
 nano::bulk_pull_account_client::bulk_pull_account_client (std::shared_ptr<nano::bootstrap_client> const & connection_a, std::shared_ptr<nano::bootstrap_attempt_wallet> const & attempt_a, nano::account const & account_a) :
 	connection (connection_a),

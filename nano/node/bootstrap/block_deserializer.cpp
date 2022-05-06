@@ -1,14 +1,11 @@
+#include <nano/lib/blocks.hpp>
 #include <nano/node/bootstrap/block_deserializer.hpp>
-
 #include <nano/node/socket.hpp>
 #include <nano/secure/buffer.hpp>
 
-#include <nano/lib/blocks.hpp>
-
 nano::bootstrap::block_deserializer::block_deserializer () :
-	read_buffer{ std::make_shared<std::vector<uint8_t>> ()}
+	read_buffer{ std::make_shared<std::vector<uint8_t>> () }
 {
-
 }
 
 void nano::bootstrap::block_deserializer::read (std::shared_ptr<nano::socket> socket, callback_type callback)

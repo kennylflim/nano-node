@@ -10,7 +10,7 @@ namespace nano
 class bootstrap_attempt;
 namespace bootstrap
 {
-class block_deserializer;
+	class block_deserializer;
 };
 class pull_info
 {
@@ -51,6 +51,7 @@ public:
 	uint64_t pull_blocks;
 	uint64_t unexpected_count;
 	bool network_error{ false };
+
 private:
 	std::shared_ptr<nano::bootstrap::block_deserializer> block_deserializer;
 };
