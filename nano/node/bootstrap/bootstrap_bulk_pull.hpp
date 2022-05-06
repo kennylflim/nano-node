@@ -41,7 +41,7 @@ public:
 	void request ();
 	void receive_block ();
 	void throttled_receive_block ();
-	void received_block (std::shared_ptr<nano::block> block);
+	void received_block (boost::system::error_code ec, std::shared_ptr<nano::block> block);
 	nano::block_hash first ();
 	std::shared_ptr<nano::bootstrap_client> connection;
 	std::shared_ptr<nano::bootstrap_attempt> attempt;

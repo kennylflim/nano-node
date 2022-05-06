@@ -8,59 +8,63 @@ nano::bootstrap::block_deserializer::block_deserializer () :
 {
 }
 
-void nano::bootstrap::block_deserializer::read (std::shared_ptr<nano::socket> socket, callback_type callback)
+void nano::bootstrap::block_deserializer::read (nano::socket & socket, callback_type const && callback)
 {
-	debug_assert (socket != nullptr);
 	debug_assert (callback);
-	reset ();
-	this->socket = socket;
 	read_buffer->resize (1);
-	socket->async_read (read_buffer, 1, [this_l = shared_from_this (), callback] (boost::system::error_code const & ec, std::size_t size_a) {
-		if (ec || size_a != 1)
+	socket.async_read (read_buffer, 1, [this_l = shared_from_this (), &socket, callback = std::move (callback)] (boost::system::error_code const & ec, std::size_t size_a) {
+		if (size_a != 1)
 		{
-			this_l->ec = ec;
-			callback (nullptr);
+			callback (boost::asio::error::fault, nullptr);
 			return;
 		}
-		this_l->received_type (callback);
+		if (ec)
+		{
+			callback (ec, nullptr);
+			return;
+		}
+		this_l->received_type (socket, std::move (callback));
 	});
 }
 
-void nano::bootstrap::block_deserializer::received_type (callback_type callback)
+void nano::bootstrap::block_deserializer::received_type (nano::socket & socket, callback_type const && callback)
 {
 	nano::block_type type = static_cast<nano::block_type> (read_buffer->data ()[0]);
 	if (type == nano::block_type::not_a_block)
 	{
-		callback (nullptr);
+		callback (boost::system::error_code{}, nullptr);
 		return;
 	}
 	auto size = block_size (type);
 	if (size == 0)
 	{
-		ec = boost::asio::error::fault;
-		callback (nullptr);
+		callback (boost::asio::error::fault, nullptr);
 		return;
 	}
 	read_buffer->resize (size);
-	socket->async_read (read_buffer, size, [this_l = shared_from_this (), size, type, callback] (boost::system::error_code const & ec, std::size_t size_a) {
-		if (ec || size_a != size)
+	socket.async_read (read_buffer, size, [this_l = shared_from_this (), size, type, callback = std::move (callback)] (boost::system::error_code const & ec, std::size_t size_a) {
+		if (size_a != size)
 		{
-			this_l->ec = ec;
-			callback (nullptr);
+			callback (boost::asio::error::fault, nullptr);
 			return;
 		}
-		this_l->received_block (type, callback);
+		if (ec)
+		{
+			callback (ec, nullptr);
+			return;
+		}
+		this_l->received_block (type, std::move (callback));
 	});
 }
 
-void nano::bootstrap::block_deserializer::received_block (nano::block_type type, callback_type callback)
+void nano::bootstrap::block_deserializer::received_block (nano::block_type type, callback_type const && callback)
 {
 	nano::bufferstream stream{ read_buffer->data (), read_buffer->size () };
-	block = nano::deserialize_block (stream, type);
-	callback (block);
+	auto block = nano::deserialize_block (stream, type);
+	callback (boost::system::error_code{}, block);
 }
 
-size_t nano::bootstrap::block_deserializer::block_size (nano::block_type type)
+std::size_t nano::bootstrap::block_deserializer::block_size (nano::block_type type)
 {
 	switch (type)
 	{
@@ -77,9 +81,4 @@ size_t nano::bootstrap::block_deserializer::block_size (nano::block_type type)
 		default:
 			return 0;
 	}
-}
-
-void nano::bootstrap::block_deserializer::reset ()
-{
-	block.reset ();
 }
