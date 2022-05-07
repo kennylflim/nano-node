@@ -18,6 +18,8 @@ add_library(
   active_transactions.cpp
   blockprocessor.hpp
   blockprocessor.cpp
+  bootstrap/block_deserializer.hpp
+  bootstrap/block_deserializer.cpp
   bootstrap/bootstrap_ascending.hpp
   bootstrap/bootstrap_ascending.cpp
   bootstrap/bootstrap_attempt.hpp
@@ -179,6 +181,8 @@ add_library(
   state_block_signature_verification.cpp
   telemetry.hpp
   telemetry.cpp
+  transport/inproc.hpp
+  transport/inproc.cpp
   transport/tcp.hpp
   transport/tcp.cpp
   transport/transport.hpp
