@@ -13,7 +13,7 @@ public:
 	
 	void run () override;
 	void get_information (boost::property_tree::ptree &) override;
-	void read_block (std::shared_ptr<nano::bootstrap_client> connection, std::promise<void> & promise);
+	void read_block (std::shared_ptr<nano::bootstrap_client> connection);
 	
 	
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t const incremental_id_a, std::string const & id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
@@ -34,6 +34,7 @@ public:
 		std::cerr << '\0';
 	}
 private:
+	void request ();
 	bool account_table{ true };
 	nano::account next{ 0 };
 	bool done{ false };
