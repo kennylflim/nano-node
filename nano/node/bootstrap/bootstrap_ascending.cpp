@@ -13,23 +13,67 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 
 void nano::bootstrap::bootstrap_ascending::run ()
 {
-	auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
-	if (connection != nullptr)
+	//std::cerr << "** Bootstrap starting\n";
+	bool done = false;
+	while (!stopped && !done)
 	{
-		debug_assert (connection != nullptr);
-		nano::bulk_pull message{ node->network_params.network };
-		message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
-		message.start = nano::dev::genesis->hash ();
-		message.end = 0;
-		std::promise<void> promise;
-		connection->channel->send (message, [this_l = std::dynamic_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ()), &promise, connection, node = node] (boost::system::error_code const &, std::size_t) {
-			// Initiate reading blocks
-			this_l->read_block (connection, promise);
-		});
-		promise.get_future ().wait ();
-		std::cerr << "done\n";
-		stop ();
-		condition.notify_all ();
+		{
+			auto tx = node->store.tx_begin_read ();
+			if (account_table)
+			{
+				auto existing = node->store.account.begin (tx, next);
+				if (existing != node->store.account.end ())
+				{
+					next = existing->first;
+				}
+				else
+				{
+					account_table = false;
+					auto existing = node->store.pending.begin (tx);
+					next = existing->first.key ();
+				}
+			}
+			else
+			{
+				auto existing = node->store.pending.begin (tx, nano::pending_key{ next, 0 });
+				if (existing != node->store.pending.end ())
+				{
+					next = existing->first.key ();
+				}
+				else
+				{
+					account_table = true;
+					auto existing = node->store.account.begin (tx);
+					next = existing->first;
+					done = true;
+				}
+			}
+		}
+		//std::cerr << "next: " << next.to_account () << std::endl;
+		if (!stopped && !done)
+		{
+			auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
+			if (connection != nullptr)
+			{
+				//std::cerr << "requesting: " << next.to_account () << " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
+				debug_assert (connection != nullptr);
+				nano::bulk_pull message{ node->network_params.network };
+				message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
+				message.start = next;
+				message.end = 0;
+				std::promise<void> promise;
+				connection->channel->send (message, [this_l = std::dynamic_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ()), &promise, connection, node = node] (boost::system::error_code const &, std::size_t) {
+					//std::cerr << "callback\n";
+					// Initiate reading blocks
+					this_l->read_block (connection, promise);
+				});
+				//std::cerr << "wait\n";
+				promise.get_future ().wait ();
+				//std::cerr << "done\n";
+				condition.notify_all ();
+			}
+			next = next.number () + 1;
+		}
 	}
 }
 
@@ -39,11 +83,12 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::boo
 	deserializer->read (*connection->socket, [this_l = std::dynamic_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ()), &promise, connection, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
-			std::cerr << "promise\n";
+			connection->connections.pool_connection (connection);
+			//std::cerr << "promise\n";
 			promise.set_value ();
 			return;
 		}
-		std::cerr << "block: " << block->hash ().to_string () << std::endl;
+		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
 		this_l->read_block (connection, promise);
 	} );

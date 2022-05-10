@@ -28,9 +28,9 @@ TEST (bootstrap_ascending, start_stop)
 }
 
 /**
- * Tests that bootstrap_ascending will return the genesis (only) block
+ * Tests the base case for returning
  */
-TEST (bootstrap_ascending, genesis)
+TEST (bootstrap_ascending, account_base)
 {
 	nano::node_flags flags;
 	nano::system system{ 1, nano::transport::transport_type::tcp, flags };
@@ -48,5 +48,79 @@ TEST (bootstrap_ascending, genesis)
 	ASSERT_EQ (nano::process_result::progress, node0.process (*send1).code);
 	auto & node1 = *system.add_node (flags);
 	ASSERT_TIMELY (5s, node1.block (send1->hash ()) != nullptr);
+}
+
+/**
+ * Tests that bootstrap_ascending will return multiple new blocks in-order
+ */
+TEST (bootstrap_ascending, account_inductive)
+{
+	nano::node_flags flags;
+	nano::system system{ 1, nano::transport::transport_type::tcp, flags };
+	auto & node0 = *system.nodes[0];
+	nano::state_block_builder builder;
+	auto send1 = builder.make_block ()
+				 .account (nano::dev::genesis_key.pub)
+				 .previous (nano::dev::genesis->hash ())
+				 .representative (nano::dev::genesis_key.pub)
+				 .link (0)
+				 .balance (nano::dev::constants.genesis_amount - 1)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (nano::dev::genesis->hash ()))
+				 .build_shared ();
+	auto send2 = builder.make_block ()
+				 .account (nano::dev::genesis_key.pub)
+				 .previous (send1->hash ())
+				 .representative (nano::dev::genesis_key.pub)
+				 .link (0)
+				 .balance (nano::dev::constants.genesis_amount - 2)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (send1->hash ()))
+				 .build_shared ();
+	ASSERT_EQ (nano::process_result::progress, node0.process (*send1).code);
+	ASSERT_EQ (nano::process_result::progress, node0.process (*send2).code);
+	auto & node1 = *system.add_node (flags);
+	ASSERT_TIMELY (5s, node1.block (send2->hash ()) != nullptr);
+}
+
+/**
+ * Tests that bootstrap_ascending will return multiple new blocks in-order
+ */
+TEST (bootstrap_ascending, trace_base)
+{
+	nano::node_flags flags;
+	nano::system system{ 1, nano::transport::transport_type::tcp, flags };
+	auto & node0 = *system.nodes[0];
+	nano::keypair key;
+	nano::state_block_builder builder;
+	auto send1 = builder.make_block ()
+				 .account (nano::dev::genesis_key.pub)
+				 .previous (nano::dev::genesis->hash ())
+				 .representative (nano::dev::genesis_key.pub)
+				 .link (key.pub)
+				 .balance (nano::dev::constants.genesis_amount - 1)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (nano::dev::genesis->hash ()))
+				 .build_shared ();
+	auto send2 = builder.make_block ()
+				 .account (key.pub)
+				 .previous (0)
+				 .representative (nano::dev::genesis_key.pub)
+				 .link (send1->hash ())
+				 .balance (1)
+				 .sign (key.prv, key.pub)
+				 .work (*system.work.generate (key.pub))
+				 .build_shared ();
+	std::cerr << "Key: " << key.pub.to_account () << std::endl;
+	std::cerr << "Genesis: " << nano::dev::genesis->hash ().to_string () << std::endl;
+	std::cerr << "send1: " << send1->hash ().to_string () << std::endl;
+	std::cerr << "send2: " << send2->hash ().to_string () << std::endl;
+	ASSERT_EQ (nano::process_result::progress, node0.process (*send1).code);
+	ASSERT_EQ (nano::process_result::progress, node0.process (*send2).code);
+	auto & node1 = *system.add_node (flags);
+	std::cerr << "--------------- Start ---------------\n";
+	std::cerr << "node0: " << node0.network.endpoint () << std::endl;
+	std::cerr << "node1: " << node1.network.endpoint () << std::endl;
+	ASSERT_TIMELY (50s, node1.block (send2->hash ()) != nullptr);
 }
 

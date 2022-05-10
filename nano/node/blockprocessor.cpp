@@ -347,6 +347,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 	auto block (info_a.block);
 	auto hash (block->hash ());
 	result = node.ledger.process (transaction_a, *block, info_a.verified);
+	//std::cerr << "inserting block: " << hash.to_string () << " " << static_cast<int> (result.code) << " on: " << node.network.endpoint () << std::endl;
 	switch (result.code)
 	{
 		case nano::process_result::progress:

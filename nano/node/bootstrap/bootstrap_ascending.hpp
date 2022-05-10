@@ -33,6 +33,10 @@ public:
 	bool request_bulk_push_target (std::pair<nano::block_hash, nano::block_hash> &) {
 		std::cerr << '\0';
 	}
+private:
+	bool account_table{ true };
+	nano::account next{ 0 };
+	bool done{ false };
 };
 }
 }
