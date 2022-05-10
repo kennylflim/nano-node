@@ -1440,7 +1440,7 @@ TEST (bootstrap_processor, wallet_lazy_pending)
 	node1->stop ();
 }
 
-TEST (bootstrap_processor, multiple_attempts)
+TEST (bootstrap_processor, DISABLED_multiple_attempts)
 {
 	nano::system system;
 	nano::node_config config (nano::get_available_port (), system.logging);
