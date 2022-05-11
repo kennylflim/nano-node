@@ -35,9 +35,9 @@ public:
 	}
 private:
 	void request ();
+	void compute_next ();
 	bool account_table{ true };
 	nano::account next{ 0 };
-	bool done{ false };
 };
 }
 }
