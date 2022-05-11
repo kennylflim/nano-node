@@ -9,6 +9,12 @@ namespace bootstrap
 class bootstrap_ascending : public nano::bootstrap_attempt
 {
 public:
+	enum class activity
+	{
+		account,
+		pending,
+		queue
+	};
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
 	
 	void run () override;
@@ -36,9 +42,11 @@ public:
 private:
 	void request ();
 	void compute_next ();
-	bool account_table{ true };
+	activity state{ activity::account };
 	nano::account next{ 0 };
 	uint64_t blocks{ 0 };
+	std::unordered_set<nano::account> requested;
+	std::deque<nano::account> queued;
 };
 }
 }

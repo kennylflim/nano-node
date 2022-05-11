@@ -41,30 +41,50 @@ void nano::bootstrap::bootstrap_ascending::request ()
 void nano::bootstrap::bootstrap_ascending::compute_next ()
 {
 	auto tx = node->store.tx_begin_read ();
-	if (account_table)
+	switch (state)
 	{
-		auto existing = node->store.account.begin (tx, next);
-		if (existing != node->store.account.end ())
+		case activity::account:
 		{
-			next = existing->first;
+			auto existing = node->store.account.begin (tx, next);
+			if (existing != node->store.account.end ())
+			{
+				next = existing->first;
+			}
+			else
+			{
+				state = activity::pending;
+				next = 0;
+				compute_next ();
+			}
+			break;
 		}
-		else
+		case activity::pending:
 		{
-			account_table = false;
-			next = 0;
-			compute_next ();
+			auto existing = node->store.pending.begin (tx, nano::pending_key{ next, 0 });
+			if (existing != node->store.pending.end ())
+			{
+				next = existing->first.key ();
+			}
+			else
+			{
+				state = activity::queue;
+				next = 0;
+				compute_next ();
+			}
+			break;
 		}
-	}
-	else
-	{
-		auto existing = node->store.pending.begin (tx, nano::pending_key{ next, 0 });
-		if (existing != node->store.pending.end ())
+		case activity::queue:
 		{
-			next = existing->first.key ();
-		}
-		else
-		{
-			stop ();
+			if (!queued.empty ())
+			{
+				next = queued.front ();
+				queued.pop_front ();
+			}
+			else
+			{
+				stop ();
+			}
+			break;
 		}
 	}
 }
