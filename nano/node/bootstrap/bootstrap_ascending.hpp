@@ -43,6 +43,7 @@ private:
 	void request ();
 	void compute_next ();
 	void load_next ();
+	void fill_drain_queue ();
 	activity state{ activity::account };
 	nano::account next{ 0 };
 	uint64_t blocks{ 0 };

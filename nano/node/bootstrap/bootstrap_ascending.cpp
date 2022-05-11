@@ -105,9 +105,23 @@ void nano::bootstrap::bootstrap_ascending::load_next ()
 void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "Starting\n";
-	request ();
+	fill_drain_queue ();
 	std::unique_lock<nano::mutex> lock{ mutex };
 	condition.wait (lock, [this] () { return stopped.load (); });
+}
+
+void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
+{
+	auto done = false;
+	while (!done)
+	{
+		request ();
+		if (!stopped)
+		{
+			node->block_processor.flush ();
+		}
+		done = stopped || queued.empty ();
+	}
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
