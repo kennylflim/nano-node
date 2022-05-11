@@ -40,6 +40,19 @@ void nano::bootstrap::bootstrap_ascending::request ()
 
 void nano::bootstrap::bootstrap_ascending::compute_next ()
 {
+	auto done = false;
+	while (!done)
+	{
+		next = next.number () + 1;
+		load_next ();
+		auto const & [iter, inserted] = requested.insert (next);
+		std::cerr << "Inserted: " << inserted << " account: " << next.to_account () << std::endl;
+		done = stopped || inserted;
+	}
+}
+
+void nano::bootstrap::bootstrap_ascending::load_next ()
+{
 	auto tx = node->store.tx_begin_read ();
 	switch (state)
 	{
@@ -54,7 +67,7 @@ void nano::bootstrap::bootstrap_ascending::compute_next ()
 			{
 				state = activity::pending;
 				next = 0;
-				compute_next ();
+				load_next ();
 			}
 			break;
 		}
@@ -69,7 +82,7 @@ void nano::bootstrap::bootstrap_ascending::compute_next ()
 			{
 				state = activity::queue;
 				next = 0;
-				compute_next ();
+				load_next ();
 			}
 			break;
 		}
