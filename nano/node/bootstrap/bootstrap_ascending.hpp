@@ -38,6 +38,7 @@ private:
 	void compute_next ();
 	bool account_table{ true };
 	nano::account next{ 0 };
+	uint64_t blocks{ 0 };
 };
 }
 }

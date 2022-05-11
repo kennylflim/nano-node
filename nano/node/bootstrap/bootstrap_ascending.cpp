@@ -13,14 +13,16 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 
 void nano::bootstrap::bootstrap_ascending::request ()
 {
+	std::cerr << "blocks: " << blocks << std::endl;
 	compute_next ();
-	//std::cerr << "next: " << next.to_account () << std::endl;
+	std::cerr << "next: " << next.to_account () << std::endl;
 	if (!stopped)
 	{
+		blocks = 0;
 		auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
 		if (connection != nullptr)
 		{
-			//std::cerr << "requesting: " << next.to_account () << " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
+			std::cerr << "requesting: " << next.to_account () << " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
 			debug_assert (connection != nullptr);
 			nano::bulk_pull message{ node->network_params.network };
 			message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
@@ -69,6 +71,7 @@ void nano::bootstrap::bootstrap_ascending::compute_next ()
 
 void nano::bootstrap::bootstrap_ascending::run ()
 {
+	std::cerr << "Starting\n";
 	request ();
 	std::unique_lock<nano::mutex> lock{ mutex };
 	condition.wait (lock, [this] () { return stopped.load (); });
@@ -87,6 +90,7 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::boo
 		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
 		this_l->read_block (connection);
+		++this_l->blocks;
 	} );
 }
 

@@ -380,7 +380,7 @@ void nano::bulk_pull_server::set_current_end ()
 		else
 		{
 			current = ascending () ? info.open_block : info.head;
-			//std::cerr << "sending block: " << current.to_string () << " for account: " << request->start.as_account ().to_account () << std::endl;
+			std::cerr << "sending block: " << current.to_string () << " for account: " << request->start.as_account ().to_account () << std::endl;
 			if (!request->end.is_zero ())
 			{
 				auto account (connection->node->ledger.account (transaction, request->end));
@@ -555,7 +555,7 @@ nano::bulk_pull_server::bulk_pull_server (std::shared_ptr<nano::bootstrap_server
 	connection (connection_a),
 	request (std::move (request_a))
 {
-	//std::cerr << "serving: " << request->start.to_account () << " from: " << connection->node->network.endpoint() << std::endl;
+	std::cerr << "serving: " << request->start.to_account () << " from: " << connection->node->network.endpoint() << std::endl;
 	set_current_end ();
 }
 
