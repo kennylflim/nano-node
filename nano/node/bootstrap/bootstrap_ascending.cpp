@@ -49,8 +49,8 @@ void nano::bootstrap::bootstrap_ascending::compute_next ()
 		else
 		{
 			account_table = false;
-			auto existing = node->store.pending.begin (tx);
-			next = existing->first.key ();
+			next = 0;
+			compute_next ();
 		}
 	}
 	else
@@ -62,9 +62,6 @@ void nano::bootstrap::bootstrap_ascending::compute_next ()
 		}
 		else
 		{
-			account_table = true;
-			auto existing = node->store.account.begin (tx);
-			next = existing->first;
 			stop ();
 		}
 	}
