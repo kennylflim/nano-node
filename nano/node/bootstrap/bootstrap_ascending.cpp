@@ -19,7 +19,7 @@ std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap
 
 void nano::bootstrap::bootstrap_ascending::request ()
 {
-	//std::cerr << "blocks: " << blocks << std::endl;
+	std::cerr << "blocks: " << blocks << std::endl;
 	compute_next ();
 	if (!stopped)
 	{
@@ -85,6 +85,24 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			}
 			else
 			{
+				state = activity::queue;
+				next = 1;
+				lock.unlock ();
+				load_next (tx);
+			}
+			break;
+		}
+		case activity::queue:
+		{
+			std::unique_lock<nano::mutex> lock{ mutex };
+			if (!queued.empty ())
+			{
+				next = queued.front ();
+				std::cerr << "dequing: " << next.to_account () << std::endl;
+				queued.pop_front ();
+			}
+			else
+			{
 				lock.unlock ();
 				stop ();
 			}
@@ -97,7 +115,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "Starting\n";
 	node->block_processor.inserted.add ([this_l = shared ()] (nano::transaction const & tx, nano::block const & block) {
-		/*if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
+		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
 		{
 			auto destination = this_l->node->ledger.block_destination (tx, block);
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
@@ -107,7 +125,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 				std::cerr << "tracing: " << destination.to_account () << std::endl;
 				this_l->queued.push_back (destination);
 			}
-		}*/
+		}
 	});
 	fill_drain_queue ();
 	std::unique_lock<nano::mutex> lock{ mutex };
@@ -116,10 +134,15 @@ void nano::bootstrap::bootstrap_ascending::run ()
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	request ();
-	if (!stopped)
+	auto done = false;
+	while (!done)
 	{
-		node->block_processor.flush ();
+		request ();
+		if (!stopped)
+		{
+			node->block_processor.flush ();
+		}
+		done = stopped || queued.empty ();
 	}
 }
 
@@ -133,7 +156,7 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::boo
 			this_l->request ();
 			return;
 		}
-		std::cerr << "block: " << block->hash ().to_string () << std::endl;
+		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
 		this_l->read_block (connection);
 		++this_l->blocks;
