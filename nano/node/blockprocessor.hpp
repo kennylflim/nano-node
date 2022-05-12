@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/utility.hpp>
 #include <nano/node/state_block_signature_verification.hpp>
 #include <nano/secure/common.hpp>
 
@@ -68,6 +69,7 @@ public:
 	std::atomic<bool> flushing{ false };
 	// Delay required for average network propagartion before requesting confirmation
 	static std::chrono::milliseconds constexpr confirmation_request_delay{ 1500 };
+	nano::observer_set<nano::transaction const &, nano::block const &> inserted;
 
 private:
 	void queue_unchecked (nano::write_transaction const &, nano::hash_or_account const &);

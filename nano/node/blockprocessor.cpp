@@ -373,6 +373,9 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 				block->link () for state blocks (send subtype) */
 				queue_unchecked (transaction_a, block->destination ().is_zero () ? block->link () : block->destination ());
 			}
+			events_a.events.emplace_back ([this, block = info_a.block] (nano::transaction const & tx) {
+				inserted.notify (tx, *block);
+			});
 			break;
 		}
 		case nano::process_result::gap_previous:
