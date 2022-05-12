@@ -12,8 +12,7 @@ public:
 	enum class activity
 	{
 		account,
-		pending,
-		queue
+		pending
 	};
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
 	
@@ -49,7 +48,6 @@ private:
 	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
 	std::unordered_set<nano::account> requested;
-	std::deque<nano::account> queued;
 };
 }
 }
