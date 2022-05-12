@@ -39,14 +39,15 @@ void nano::bootstrap::bootstrap_ascending::request ()
 	next = next.number () + 1;
 }
 
-void nano::bootstrap::bootstrap_ascending::compute_next ()
+bool nano::bootstrap::bootstrap_ascending::compute_next ()
 {
 	next = next.number () + 1;
-	load_next (node->store.tx_begin_read ());
+	return load_next (node->store.tx_begin_read ());
 }
 
-void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & tx)
+bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & tx)
 {
+	bool result = false;
 	switch (state)
 	{
 		case activity::account:
@@ -62,7 +63,7 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 				state = activity::pending;
 				next = 1;
 				lock.unlock ();
-				load_next (tx);
+				result = load_next (tx);
 			}
 			break;
 		}
@@ -79,7 +80,7 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 				state = activity::queue;
 				next = 1;
 				lock.unlock ();
-				load_next (tx);
+				result = load_next (tx);
 			}
 			break;
 		}
@@ -95,11 +96,12 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			else
 			{
 				lock.unlock ();
-				stop ();
+				result = true;
 			}
 			break;
 		}
 	}
+	return result;
 }
 
 void nano::bootstrap::bootstrap_ascending::run ()
@@ -125,15 +127,20 @@ void nano::bootstrap::bootstrap_ascending::run ()
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	while (!stopped)
+	bool done = false;
+	while (!stopped && !done)
 	{
-		compute_next ();
-		request ();
-		std::unique_lock<nano::mutex> lock{ mutex };
-		condition.wait (lock, [this] () { return stopped || requests < 1; });
+		done = compute_next ();
+		if (!done)
+		{
+			request ();
+			std::unique_lock<nano::mutex> lock{ mutex };
+			condition.wait (lock, [this] () { return stopped || requests < 1; });
+		}
 	}
 	if (!stopped)
 	{
+		stop ();
 		node->block_processor.flush ();
 	}
 }
