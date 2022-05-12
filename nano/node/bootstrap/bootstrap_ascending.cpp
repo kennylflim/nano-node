@@ -19,29 +19,24 @@ std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap
 
 void nano::bootstrap::bootstrap_ascending::request ()
 {
-	std::cerr << "blocks: " << blocks << std::endl;
-	compute_next ();
-	if (!stopped)
+	std::cerr << "next: " << next.to_account () << std::endl;
+	blocks = 0;
+	auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
+	if (connection != nullptr)
 	{
-		std::cerr << "next: " << next.to_account () << std::endl;
-		blocks = 0;
-		auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
-		if (connection != nullptr)
-		{
-			std::cerr << "requesting: " << next.to_account () << " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
-			debug_assert (connection != nullptr);
-			nano::bulk_pull message{ node->network_params.network };
-			message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
-			message.start = next;
-			message.end = 0;
-			connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
-				//std::cerr << "callback\n";
-				// Initiate reading blocks
-				this_l->read_block (connection);
-			});
-		}
-		next = next.number () + 1;
+		std::cerr << "requesting: " << next.to_account () << " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
+		debug_assert (connection != nullptr);
+		nano::bulk_pull message{ node->network_params.network };
+		message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
+		message.start = next;
+		message.end = 0;
+		connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
+			//std::cerr << "callback\n";
+			// Initiate reading blocks
+			this_l->read_block (connection);
+		});
 	}
+	next = next.number () + 1;
 }
 
 void nano::bootstrap::bootstrap_ascending::compute_next ()
@@ -134,7 +129,11 @@ void nano::bootstrap::bootstrap_ascending::run ()
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	request ();
+	while (!stopped)
+	{
+		compute_next ();
+		request ();
+	}
 	if (!stopped)
 	{
 		node->block_processor.flush ();
@@ -148,7 +147,6 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::boo
 		if (block == nullptr)
 		{
 			connection->connections.pool_connection (connection);
-			this_l->request ();
 			return;
 		}
 		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
