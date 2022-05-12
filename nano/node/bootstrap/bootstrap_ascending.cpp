@@ -45,7 +45,6 @@ void nano::bootstrap::bootstrap_ascending::request ()
 			this_l->read_block (connection);
 		});
 	}
-	next = next.number () + 1;
 }
 
 bool nano::bootstrap::bootstrap_ascending::compute_next ()
