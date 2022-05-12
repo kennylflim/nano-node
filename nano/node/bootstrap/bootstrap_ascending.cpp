@@ -47,18 +47,11 @@ void nano::bootstrap::bootstrap_ascending::request ()
 void nano::bootstrap::bootstrap_ascending::compute_next ()
 {
 	auto tx = node->store.tx_begin_read ();
-	auto done = false;
-	while (!done)
-	{
-		std::unique_lock<nano::mutex> lock{ mutex };
-		next = next.number () + 1;
-		lock.unlock ();
-		load_next (tx);
-		lock.lock ();
-		auto const & [iter, inserted] = requested.insert (next);
-		std::cerr << "Inserted: " << inserted << " account: " << next.to_account () << std::endl;
-		done = stopped || inserted;
-	}
+	std::unique_lock<nano::mutex> lock{ mutex };
+	next = next.number () + 1;
+	lock.unlock ();
+	load_next (tx);
+	lock.lock ();
 }
 
 void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & tx)
