@@ -107,7 +107,12 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "!! Starting\n";
-	node->block_processor.inserted.add ([this_l = shared ()] (nano::transaction const & tx, nano::block const & block) {
+	node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
+		auto this_l = this_w.lock ();
+		if (this_l == nullptr)
+		{
+			return;
+		}
 		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
 		{
 			auto destination = this_l->node->ledger.block_destination (tx, block);
