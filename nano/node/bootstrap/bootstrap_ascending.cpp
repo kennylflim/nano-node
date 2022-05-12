@@ -19,19 +19,6 @@ std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap
 
 void nano::bootstrap::bootstrap_ascending::request ()
 {
-	node->block_processor.inserted.add ([this_l = shared ()] (nano::transaction const & tx, nano::block const & block) {
-		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
-		{
-			auto destination = this_l->node->ledger.block_destination (tx, block);
-			std::lock_guard<nano::mutex> lock{ this_l->mutex };
-			auto const & [iter, inserted] = this_l->requested.insert (destination);
-			if (inserted)
-			{
-				std::cerr << "tracing: " << destination.to_account () << std::endl;
-				this_l->queued.push_back (destination);
-			}
-		}
-	});
 	std::cerr << "blocks: " << blocks << std::endl;
 	compute_next ();
 	std::cerr << "next: " << next.to_account () << std::endl;
@@ -134,6 +121,19 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "Starting\n";
+	node->block_processor.inserted.add ([this_l = shared ()] (nano::transaction const & tx, nano::block const & block) {
+		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
+		{
+			auto destination = this_l->node->ledger.block_destination (tx, block);
+			std::lock_guard<nano::mutex> lock{ this_l->mutex };
+			auto const & [iter, inserted] = this_l->requested.insert (destination);
+			if (inserted)
+			{
+				std::cerr << "tracing: " << destination.to_account () << std::endl;
+				this_l->queued.push_back (destination);
+			}
+		}
+	});
 	fill_drain_queue ();
 	std::unique_lock<nano::mutex> lock{ mutex };
 	condition.wait (lock, [this] () { return stopped.load (); });
