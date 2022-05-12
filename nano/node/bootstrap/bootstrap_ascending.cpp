@@ -1,5 +1,6 @@
 #include <nano/node/bootstrap/bootstrap_ascending.hpp>
 #include <nano/node/bootstrap/block_deserializer.hpp>
+#include <nano/secure/common.hpp>
 
 #include <nano/node/node.hpp>
 
@@ -11,8 +12,26 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 	std::cerr << '\0';
 }
 
+std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap_ascending::shared ()
+{
+	return std::static_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ());
+}
+
 void nano::bootstrap::bootstrap_ascending::request ()
 {
+	node->block_processor.inserted.add ([this_l = shared ()] (nano::transaction const & tx, nano::block const & block) {
+		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
+		{
+			auto destination = this_l->node->ledger.block_destination (tx, block);
+			std::lock_guard<nano::mutex> lock{ this_l->mutex };
+			auto const & [iter, inserted] = this_l->requested.insert (destination);
+			if (inserted)
+			{
+				std::cerr << "tracing: " << destination.to_account () << std::endl;
+				this_l->queued.push_back (destination);
+			}
+		}
+	});
 	std::cerr << "blocks: " << blocks << std::endl;
 	compute_next ();
 	std::cerr << "next: " << next.to_account () << std::endl;
@@ -28,7 +47,7 @@ void nano::bootstrap::bootstrap_ascending::request ()
 			message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 			message.start = next;
 			message.end = 0;
-			connection->channel->send (message, [this_l = std::dynamic_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ()), connection, node = node] (boost::system::error_code const &, std::size_t) {
+			connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
 				//std::cerr << "callback\n";
 				// Initiate reading blocks
 				this_l->read_block (connection);
@@ -40,25 +59,29 @@ void nano::bootstrap::bootstrap_ascending::request ()
 
 void nano::bootstrap::bootstrap_ascending::compute_next ()
 {
+	auto tx = node->store.tx_begin_read ();
 	auto done = false;
 	while (!done)
 	{
+		std::unique_lock<nano::mutex> lock{ mutex };
 		next = next.number () + 1;
-		load_next ();
+		lock.unlock ();
+		load_next (tx);
+		lock.lock ();
 		auto const & [iter, inserted] = requested.insert (next);
 		std::cerr << "Inserted: " << inserted << " account: " << next.to_account () << std::endl;
 		done = stopped || inserted;
 	}
 }
 
-void nano::bootstrap::bootstrap_ascending::load_next ()
+void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & tx)
 {
-	auto tx = node->store.tx_begin_read ();
 	switch (state)
 	{
 		case activity::account:
 		{
 			auto existing = node->store.account.begin (tx, next);
+			std::unique_lock<nano::mutex> lock{ mutex };
 			if (existing != node->store.account.end ())
 			{
 				next = existing->first;
@@ -67,13 +90,15 @@ void nano::bootstrap::bootstrap_ascending::load_next ()
 			{
 				state = activity::pending;
 				next = 0;
-				load_next ();
+				lock.unlock ();
+				load_next (tx);
 			}
 			break;
 		}
 		case activity::pending:
 		{
 			auto existing = node->store.pending.begin (tx, nano::pending_key{ next, 0 });
+			std::unique_lock<nano::mutex> lock{ mutex };
 			if (existing != node->store.pending.end ())
 			{
 				next = existing->first.key ();
@@ -82,19 +107,23 @@ void nano::bootstrap::bootstrap_ascending::load_next ()
 			{
 				state = activity::queue;
 				next = 0;
-				load_next ();
+				lock.unlock ();
+				load_next (tx);
 			}
 			break;
 		}
 		case activity::queue:
 		{
+			std::unique_lock<nano::mutex> lock{ mutex };
 			if (!queued.empty ())
 			{
 				next = queued.front ();
+				std::cerr << "dequing: " << next.to_account () << std::endl;
 				queued.pop_front ();
 			}
 			else
 			{
+				lock.unlock ();
 				stop ();
 			}
 			break;
@@ -127,7 +156,7 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
-	deserializer->read (*connection->socket, [this_l = std::dynamic_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ()), connection, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+	deserializer->read (*connection->socket, [this_l = shared (), connection, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
 			connection->connections.pool_connection (connection);

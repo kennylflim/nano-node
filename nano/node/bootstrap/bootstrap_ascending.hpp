@@ -42,8 +42,9 @@ public:
 private:
 	void request ();
 	void compute_next ();
-	void load_next ();
+	void load_next (nano::transaction const & tx);
 	void fill_drain_queue ();
+	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	activity state{ activity::account };
 	nano::account next{ 0 };
 	uint64_t blocks{ 0 };
