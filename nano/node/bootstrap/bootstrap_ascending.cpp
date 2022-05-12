@@ -159,9 +159,9 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 		if (!stopped)
 		{
 			node->block_processor.flush ();
-			std::this_thread::sleep_for (250ms);
 		}
 	} while (!stopped && !queued.empty ());
+	std::cerr << "stopped: " << stopped.load () << " queued: " << queued.empty () << std::endl;
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
