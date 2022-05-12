@@ -34,9 +34,9 @@ void nano::bootstrap::bootstrap_ascending::request ()
 	});
 	std::cerr << "blocks: " << blocks << std::endl;
 	compute_next ();
-	if (!stopped && !next.is_zero ())
+	std::cerr << "next: " << next.to_account () << std::endl;
+	if (!stopped)
 	{
-		std::cerr << "next: " << next.to_account () << std::endl;
 		blocks = 0;
 		auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
 		if (connection != nullptr)
@@ -68,10 +68,6 @@ void nano::bootstrap::bootstrap_ascending::compute_next ()
 		lock.unlock ();
 		load_next (tx);
 		lock.lock ();
-		if (next.is_zero ())
-		{
-			return;
-		}
 		auto const & [iter, inserted] = requested.insert (next);
 		std::cerr << "Inserted: " << inserted << " account: " << next.to_account () << std::endl;
 		done = stopped || inserted;
@@ -89,7 +85,6 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			if (existing != node->store.account.end ())
 			{
 				next = existing->first;
-				std::cerr << "From accounts: " << next.to_account () << std::endl;
 			}
 			else
 			{
@@ -107,7 +102,6 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			if (existing != node->store.pending.end ())
 			{
 				next = existing->first.key ();
-				std::cerr << "From pending: " << next.to_account () << std::endl;
 			}
 			else
 			{
@@ -124,12 +118,13 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			if (!queued.empty ())
 			{
 				next = queued.front ();
-				std::cerr << "From queue: " << next.to_account () << std::endl;
+				std::cerr << "dequing: " << next.to_account () << std::endl;
 				queued.pop_front ();
 			}
 			else
 			{
-				next = 0;
+				lock.unlock ();
+				stop ();
 			}
 			break;
 		}
@@ -156,7 +151,6 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 		}
 		done = stopped || queued.empty ();
 	}
-	stop ();
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
