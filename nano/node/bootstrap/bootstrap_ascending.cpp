@@ -24,12 +24,20 @@ void nano::bootstrap::bootstrap_ascending::request ()
 	auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
 	if (connection != nullptr)
 	{
-		std::cerr << "requesting: " << next.to_account () << " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
+		nano::hash_or_account start = next;
+		nano::account_info info;
+		if (!node->store.account.get (node->store.tx_begin_read (), next, info))
+		{
+			start = info.head;
+		}
+		std::cerr << "requesting: " << next.to_account () << " at: " << start.to_string () <<  " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
 		debug_assert (connection != nullptr);
 		nano::bulk_pull message{ node->network_params.network };
 		message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
-		message.start = next;
+		message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
+		message.start = start;
 		message.end = 0;
+		message.count = 1000;
 		++requests;
 		connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
 			//std::cerr << "callback\n";
