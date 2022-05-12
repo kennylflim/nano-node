@@ -30,6 +30,7 @@ void nano::bootstrap::bootstrap_ascending::request ()
 		message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 		message.start = next;
 		message.end = 0;
+		++requests;
 		connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
 			//std::cerr << "callback\n";
 			// Initiate reading blocks
@@ -126,29 +127,33 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		}
 	});
 	fill_drain_queue ();
-	std::unique_lock<nano::mutex> lock{ mutex };
-	condition.wait (lock, [this] () { return stopped.load (); });
+	stop ();
 	std::cerr << "!! stopping\n";
 }
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	bool done = false;
-	while (!stopped && !done)
+	do
 	{
-		done = compute_next ();
-		if (!done)
+		bool done = false;
+		while (!stopped && !done)
 		{
-			request ();
-			std::unique_lock<nano::mutex> lock{ mutex };
-			condition.wait (lock, [this] () { return stopped || requests < 1; });
+			done = compute_next ();
+			if (!done)
+			{
+				request ();
+				std::unique_lock<nano::mutex> lock{ mutex };
+				condition.wait (lock, [this] () { return stopped || requests < 1; });
+				std::cerr << "blocks: " << blocks << std::endl;
+				blocks = 0;
+			}
 		}
-	}
-	if (!stopped)
-	{
-		stop ();
-		node->block_processor.flush ();
-	}
+		if (!stopped)
+		{
+			node->block_processor.flush ();
+			std::this_thread::sleep_for (250ms);
+		}
+	} while (!stopped && !queued.empty ());
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
