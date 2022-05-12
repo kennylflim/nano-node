@@ -21,9 +21,9 @@ void nano::bootstrap::bootstrap_ascending::request ()
 {
 	std::cerr << "blocks: " << blocks << std::endl;
 	compute_next ();
-	std::cerr << "next: " << next.to_account () << std::endl;
 	if (!stopped)
 	{
+		std::cerr << "next: " << next.to_account () << std::endl;
 		blocks = 0;
 		auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
 		if (connection != nullptr)
