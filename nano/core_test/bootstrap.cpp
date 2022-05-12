@@ -158,11 +158,7 @@ TEST (bulk_pull, ascending_two)
 	auto request = std::make_shared<nano::bulk_pull_server> (connection, std::move (req));
 	auto block_out1 = request->get_next ();
 	ASSERT_NE (nullptr, block_out1);
-	ASSERT_EQ (block_out1->hash (), nano::dev::genesis->hash ());
-	auto block_out2 = request->get_next ();
-	ASSERT_NE (nullptr, block_out2);
-	ASSERT_EQ (block_out2->hash (), block1->hash ());
-	ASSERT_EQ (nullptr, request->get_next ());
+	ASSERT_EQ (block_out1->hash (), block1->hash ());
 }
 
 TEST (bulk_pull, ascending_one_account)

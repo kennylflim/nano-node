@@ -19,7 +19,6 @@ std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap
 
 void nano::bootstrap::bootstrap_ascending::request ()
 {
-	std::cerr << "next: " << next.to_account () << std::endl;
 	blocks = 0;
 	auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
 	if (connection != nullptr)
@@ -37,7 +36,7 @@ void nano::bootstrap::bootstrap_ascending::request ()
 		message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
 		message.start = start;
 		message.end = 0;
-		message.count = 1000;
+		message.count = cutoff;
 		++requests;
 		connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
 			//std::cerr << "callback\n";
@@ -98,7 +97,7 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			if (!queued.empty ())
 			{
 				next = queued.front ();
-				std::cerr << "dequing: " << next.to_account () << std::endl;
+				//std::cerr << "dequing: " << next.to_account () << std::endl;
 				queued.pop_front ();
 			}
 			else
@@ -121,6 +120,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			return;
 		}
+		//std::cerr << "done: " << block.hash ().to_string () << std::endl;
 		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
 		{
 			auto destination = this_l->node->ledger.block_destination (tx, block);
@@ -140,8 +140,11 @@ void nano::bootstrap::bootstrap_ascending::run ()
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
+	bool dirty = false;
 	do
 	{
+		std::cerr << "Begin pass\n";
+		dirty = false;
 		bool done = false;
 		while (!stopped && !done)
 		{
@@ -151,16 +154,29 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 				request ();
 				std::unique_lock<nano::mutex> lock{ mutex };
 				condition.wait (lock, [this] () { return stopped || requests < 1; });
+				dirty |= blocks > 1;
 				std::cerr << "blocks: " << blocks << std::endl;
+				if (blocks >= cutoff)
+				{
+					requeue.push_back (next);
+				}
 				blocks = 0;
 			}
 		}
 		if (!stopped)
 		{
 			node->block_processor.flush ();
+			std::unique_lock<nano::mutex> lock{ mutex };
+			std::cerr << "requeueing: " << requeue.size () << std::endl;
+			std::move (requeue.begin (), requeue.end (), std::back_inserter (queued));
+			requeue.clear ();
+			requested.clear ();
+			lock.unlock ();
+			//std::this_thread::sleep_for(50ms);
 		}
-	} while (!stopped && !queued.empty ());
-	std::cerr << "stopped: " << stopped.load () << " queued: " << queued.empty () << std::endl;
+		std::cerr << "End pass\n";
+	} while (!stopped && (!queued.empty () || dirty));
+	std::cerr << "stopped: " << stopped.load () << " queued: " << queued.empty () << " dirty: " << dirty << std::endl;
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)

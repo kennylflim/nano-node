@@ -50,7 +50,9 @@ private:
 	uint64_t blocks{ 0 };
 	std::unordered_set<nano::account> requested;
 	std::deque<nano::account> queued;
+	std::deque<nano::account> requeue;
 	std::atomic<int> requests{ 0 };
+	static size_t constexpr cutoff = 1000;
 };
 }
 }
