@@ -134,15 +134,10 @@ void nano::bootstrap::bootstrap_ascending::run ()
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	auto done = false;
-	while (!done)
+	request ();
+	if (!stopped)
 	{
-		request ();
-		if (!stopped)
-		{
-			node->block_processor.flush ();
-		}
-		done = stopped || queued.empty ();
+		node->block_processor.flush ();
 	}
 }
 
