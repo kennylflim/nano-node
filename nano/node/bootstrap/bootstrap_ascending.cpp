@@ -129,6 +129,8 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 	{
 		compute_next ();
 		request ();
+		std::unique_lock<nano::mutex> lock{ mutex };
+		condition.wait (lock, [this] () { return stopped || requests < 1; });
 	}
 	if (!stopped)
 	{
@@ -143,6 +145,8 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::boo
 		if (block == nullptr)
 		{
 			connection->connections.pool_connection (connection);
+			--this_l->requests;
+			this_l->condition.notify_all ();
 			return;
 		}
 		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
