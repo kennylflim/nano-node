@@ -89,7 +89,7 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			else
 			{
 				state = activity::pending;
-				next = 0;
+				next = 1;
 				lock.unlock ();
 				load_next (tx);
 			}
@@ -106,7 +106,7 @@ void nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			else
 			{
 				state = activity::queue;
-				next = 0;
+				next = 1;
 				lock.unlock ();
 				load_next (tx);
 			}

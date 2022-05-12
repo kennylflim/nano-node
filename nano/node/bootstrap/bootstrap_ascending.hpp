@@ -46,7 +46,7 @@ private:
 	void fill_drain_queue ();
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	activity state{ activity::account };
-	nano::account next{ 0 };
+	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
 	std::unordered_set<nano::account> requested;
 	std::deque<nano::account> queued;
