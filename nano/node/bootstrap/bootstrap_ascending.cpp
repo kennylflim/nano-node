@@ -106,7 +106,7 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 
 void nano::bootstrap::bootstrap_ascending::run ()
 {
-	std::cerr << "Starting\n";
+	std::cerr << "!! Starting\n";
 	node->block_processor.inserted.add ([this_l = shared ()] (nano::transaction const & tx, nano::block const & block) {
 		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
 		{
@@ -123,6 +123,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 	fill_drain_queue ();
 	std::unique_lock<nano::mutex> lock{ mutex };
 	condition.wait (lock, [this] () { return stopped.load (); });
+	std::cerr << "!! stopping\n";
 }
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
