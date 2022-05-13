@@ -52,7 +52,7 @@ private:
 	std::deque<nano::account> queued;
 	std::deque<nano::account> requeue;
 	std::atomic<int> requests{ 0 };
-	static size_t constexpr cutoff = 64;
+	static size_t constexpr cutoff = 1024;
 };
 }
 }
