@@ -48,10 +48,10 @@ private:
 	activity state{ activity::account };
 	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
-	std::unordered_set<nano::account> queued;
+	std::unordered_set<nano::account> queue;
 	std::unordered_set<nano::account> requeue;
 	std::atomic<int> requests{ 0 };
-	static size_t constexpr cutoff = 1;
+	static size_t constexpr cutoff = 16384;
 };
 }
 }

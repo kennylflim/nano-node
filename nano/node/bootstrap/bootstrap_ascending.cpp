@@ -94,11 +94,11 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 		case activity::queue:
 		{
 			std::unique_lock<nano::mutex> lock{ mutex };
-			if (!queued.empty ())
+			if (!queue.empty ())
 			{
-				auto item = queued.begin ();
+				auto item = queue.begin ();
 				next = *item;
-				queued.erase (item);
+				queue.erase (item);
 			}
 			else
 			{
@@ -125,7 +125,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			auto destination = this_l->node->ledger.block_destination (tx, block);
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
-			this_l->queued.insert (destination);
+			this_l->queue.insert (destination);
 		}
 	});
 	fill_drain_queue ();
@@ -157,15 +157,20 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 		}
 		if (!stopped)
 		{
-			node->block_processor.flush ();
 			std::unique_lock<nano::mutex> lock{ mutex };
+			if (queue.empty () && requeue.empty ())
+			{
+				lock.unlock ();
+				node->block_processor.flush ();
+				lock.lock ();
+			}
 			std::cerr << "requeueing: " << requeue.size () << std::endl;
-			queued.insert (requeue.begin (), requeue.end ());
+			queue.insert (requeue.begin (), requeue.end ());
 			requeue.clear ();
 		}
 		std::cerr << "End pass\n";
-	} while (!stopped && !queued.empty ());
-	std::cerr << "stopped: " << stopped.load () << " queued: " << queued.empty () << std::endl;
+	} while (!stopped && !queue.empty ());
+	std::cerr << "stopped: " << stopped.load () << " queued: " << queue.empty () << std::endl;
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
