@@ -96,9 +96,9 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			std::unique_lock<nano::mutex> lock{ mutex };
 			if (!queued.empty ())
 			{
-				next = queued.front ();
-				//std::cerr << "dequing: " << next.to_account () << std::endl;
-				queued.pop_front ();
+				auto item = queued.begin ();
+				next = *item;
+				queued.erase (item);
 			}
 			else
 			{
@@ -125,12 +125,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			auto destination = this_l->node->ledger.block_destination (tx, block);
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
-			auto const & [iter, inserted] = this_l->requested.insert (destination);
-			if (inserted)
-			{
-				//std::cerr << "tracing: " << destination.to_account () << std::endl;
-				this_l->queued.push_back (destination);
-			}
+			this_l->queued.insert (destination);
 		}
 	});
 	fill_drain_queue ();
@@ -155,7 +150,7 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 				std::cerr << "blocks: " << blocks << std::endl;
 				if (blocks >= cutoff)
 				{
-					requeue.push_back (next);
+					requeue.insert (next);
 				}
 				blocks = 0;
 			}
@@ -165,11 +160,8 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 			node->block_processor.flush ();
 			std::unique_lock<nano::mutex> lock{ mutex };
 			std::cerr << "requeueing: " << requeue.size () << std::endl;
-			std::move (requeue.begin (), requeue.end (), std::back_inserter (queued));
+			queued.insert (requeue.begin (), requeue.end ());
 			requeue.clear ();
-			requested.clear ();
-			lock.unlock ();
-			//std::this_thread::sleep_for(50ms);
 		}
 		std::cerr << "End pass\n";
 	} while (!stopped && !queued.empty ());
