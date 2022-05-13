@@ -128,7 +128,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			auto const & [iter, inserted] = this_l->requested.insert (destination);
 			if (inserted)
 			{
-				std::cerr << "tracing: " << destination.to_account () << std::endl;
+				//std::cerr << "tracing: " << destination.to_account () << std::endl;
 				this_l->queued.push_back (destination);
 			}
 		}
