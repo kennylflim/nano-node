@@ -140,11 +140,9 @@ void nano::bootstrap::bootstrap_ascending::run ()
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	bool dirty = false;
 	do
 	{
 		std::cerr << "Begin pass\n";
-		dirty = false;
 		bool done = false;
 		while (!stopped && !done)
 		{
@@ -154,7 +152,6 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 				request ();
 				std::unique_lock<nano::mutex> lock{ mutex };
 				condition.wait (lock, [this] () { return stopped || requests < 1; });
-				dirty |= blocks > 1;
 				std::cerr << "blocks: " << blocks << std::endl;
 				if (blocks >= cutoff)
 				{
@@ -175,8 +172,8 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 			//std::this_thread::sleep_for(50ms);
 		}
 		std::cerr << "End pass\n";
-	} while (!stopped && (!queued.empty () || dirty));
-	std::cerr << "stopped: " << stopped.load () << " queued: " << queued.empty () << " dirty: " << dirty << std::endl;
+	} while (!stopped && !queued.empty ());
+	std::cerr << "stopped: " << stopped.load () << " queued: " << queued.empty () << std::endl;
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
