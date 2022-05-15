@@ -20,30 +20,47 @@ std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap
 void nano::bootstrap::bootstrap_ascending::request ()
 {
 	blocks = 0;
-	auto connection = node->bootstrap_initiator.connections->connection (shared_from_this (), true);
-	if (connection != nullptr)
+	auto endpoint = node->network.bootstrap_peer (true);
+	auto socket = std::make_shared<nano::client_socket> (*node);
+	if (endpoint != nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
 	{
-		nano::hash_or_account start = next;
-		nano::account_info info;
-		if (!node->store.account.get (node->store.tx_begin_read (), next, info))
-		{
-			start = info.head;
-		}
-		std::cerr << "requesting: " << next.to_account () << " at: " << start.to_string () <<  " from endpoint: " << connection->socket->remote_endpoint() << std::endl;
-		debug_assert (connection != nullptr);
-		nano::bulk_pull message{ node->network_params.network };
-		message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
-		message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
-		message.start = start;
-		message.end = 0;
-		message.count = cutoff;
 		++requests;
-		connection->channel->send (message, [this_l = shared (), connection, node = node] (boost::system::error_code const &, std::size_t) {
-			//std::cerr << "callback\n";
-			// Initiate reading blocks
-			this_l->read_block (connection);
+		socket->async_connect (endpoint,
+		[this_l = shared (), socket, endpoint] (boost::system::error_code const & ec) {
+			if (ec)
+			{
+				--this_l->requests;
+				return;
+			}
+			this_l->on_connect (socket, std::make_shared<nano::transport::channel_tcp> (*this_l->node, socket));
 		});
 	}
+	else
+	{
+		std::cerr << "No endpoints\n";
+	}
+}
+
+void nano::bootstrap::bootstrap_ascending::on_connect (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel_tcp> channel)
+{
+	nano::hash_or_account start = next;
+	nano::account_info info;
+	if (!node->store.account.get (node->store.tx_begin_read (), next, info))
+	{
+		start = info.head;
+	}
+	std::cerr << "requesting: " << next.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
+	nano::bulk_pull message{ node->network_params.network };
+	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
+	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
+	message.start = start;
+	message.end = 0;
+	message.count = cutoff;
+	channel->send (message, [this_l = shared (), socket, channel, node = node] (boost::system::error_code const &, std::size_t) {
+		//std::cerr << "callback\n";
+		// Initiate reading blocks
+		this_l->read_block (socket, channel);
+	});
 }
 
 bool nano::bootstrap::bootstrap_ascending::compute_next ()
@@ -173,20 +190,19 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 	std::cerr << "stopped: " << stopped.load () << " queued: " << queue.empty () << std::endl;
 }
 
-void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::bootstrap_client> connection)
+void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel_tcp> channel)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
-	deserializer->read (*connection->socket, [this_l = shared (), connection, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+	deserializer->read (*socket, [this_l = shared (), socket, channel, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
-			connection->connections.pool_connection (connection);
 			--this_l->requests;
 			this_l->condition.notify_all ();
 			return;
 		}
 		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
-		this_l->read_block (connection);
+		this_l->read_block (socket, channel);
 		++this_l->blocks;
 	} );
 }

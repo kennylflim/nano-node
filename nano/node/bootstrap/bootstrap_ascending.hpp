@@ -19,7 +19,7 @@ public:
 	
 	void run () override;
 	void get_information (boost::property_tree::ptree &) override;
-	void read_block (std::shared_ptr<nano::bootstrap_client> connection);
+	void read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel_tcp> channel);
 	
 	
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t const incremental_id_a, std::string const & id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
@@ -41,6 +41,7 @@ public:
 	}
 private:
 	void request ();
+	void on_connect (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel_tcp> channel);
 	bool compute_next ();
 	bool load_next (nano::transaction const & tx);
 	void fill_drain_queue ();
