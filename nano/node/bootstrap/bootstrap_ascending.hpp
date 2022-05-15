@@ -4,6 +4,10 @@
 
 namespace nano
 {
+namespace transport
+{
+class channel;
+}
 namespace bootstrap
 {
 class bootstrap_ascending : public nano::bootstrap_attempt
@@ -19,7 +23,7 @@ public:
 	
 	void run () override;
 	void get_information (boost::property_tree::ptree &) override;
-	void read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel_tcp> channel);
+	void read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel);
 	
 	
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t const incremental_id_a, std::string const & id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
@@ -41,18 +45,22 @@ public:
 	}
 private:
 	void request ();
-	void on_connect (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel_tcp> channel);
+	void request (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel);
 	bool compute_next ();
 	bool load_next (nano::transaction const & tx);
 	void fill_drain_queue ();
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
+	std::deque<std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>> sockets;
 	activity state{ activity::account };
 	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
 	std::unordered_set<nano::account> queue;
 	std::unordered_set<nano::account> requeue;
 	std::atomic<int> requests{ 0 };
-	static size_t constexpr cutoff = 16384;
+	static size_t constexpr cutoff = 256;
+	std::atomic<int> a{ 0 };
+	std::atomic<int> p{ 0 };
+	std::atomic<int> q{ 0 };
 };
 }
 }
