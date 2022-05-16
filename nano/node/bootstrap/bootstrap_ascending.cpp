@@ -151,31 +151,38 @@ static int pass_number = 0;
 void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "!! Starting with:" << std::to_string (pass_number++) << "\n";
-	/*node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
+	node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
 		auto this_l = this_w.lock ();
 		if (this_l == nullptr)
 		{
 			return;
 		}
+		auto account = this_l->node->ledger.account (tx, block.hash ());
+		debug_assert (this_l->misses.count (account) > 0);
+		this_l->misses[account] >>= 1;
 		//std::cerr << "done: " << block.hash ().to_string () << std::endl;
-		if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
+		/*if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
 		{
 			auto destination = this_l->node->ledger.block_destination (tx, block);
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->queue.insert (destination);
-		}
-	});*/
+		}*/
+		
+	});
 	auto dirty = true;
 	uint32_t filter = 1;
-	while (dirty)
+	while (!stopped && dirty)
 	{
-		while (dirty)
+		while (!stopped && dirty)
 		{
 			dirty = run_pass (1);
 		}
-		filtered = 0;
-		dirty = run_pass (filter);
-		filter = filtered == 0 ? 1 : filter << 1;
+		if (!stopped)
+		{
+			filtered = 0;
+			dirty = run_pass (filter);
+			filter = filtered == 0 ? 1 : filter << 1;
+		}
 	}
 	stop ();
 	std::cerr << "!! stopping" << std::endl;
@@ -217,10 +224,7 @@ bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
 			std::unique_lock<nano::mutex> lock{ mutex };
 			condition.wait (lock, [this] () { return stopped || requests < 1; });
 			auto overflow = blocks >= cutoff;
-			if (overflow || blocks == 0)
-			{
-				++misses[next];
-			}
+			++misses[next];
 			if (overflow)
 			{
 				++o;
@@ -229,10 +233,6 @@ bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
 			if (blocks == 0)
 			{
 				++m;
-			}
-			else
-			{
-				misses[next] = 0;
 			}
 		}
 	}
