@@ -188,12 +188,12 @@ bool nano::bootstrap::bootstrap_ascending::run_pass (uint32_t filter)
 	auto start_count = node->ledger.cache.block_count.load ();
 	std::cerr << "Filter: " << std::to_string (filter) << std::endl;
 	fill_drain_queue (filter);
-	std::cerr << " o: " << std::to_string (o) << " m: " << std::to_string (m) << " s: " << std::to_string (s) << " u: " << std::to_string (u) << std::endl;
-	o = m = s = u = 0;
+	std::cerr << " o: " << std::to_string (o) << " r: " << std::to_string (r) << " m: " << std::to_string (m) << " s: " << std::to_string (s) << " u: " << std::to_string (u) << std::endl;
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::steady_clock::now () - start).count ();
 	uint64_t delta = node->ledger.cache.block_count.load () - start_count;
 	dirty = delta > 0;
-	std::cerr << "time(ms): " << std::to_string (ms) << " delta: " << std::to_string (delta) << " bps: " << std::to_string ((static_cast<double>(delta) / ms) * 1000.0) << std::endl;
+	std::cerr << "time(ms): " << std::to_string (ms) << " delta: " << std::to_string (delta) << " bps: " << std::to_string ((static_cast<double>(delta) / ms) * 1000.0) << " miss rate: " << std::to_string (static_cast<double> (m) / r) << " dup: " << std::to_string (node->store.unchecked.dup) << std::endl;
+	m = o = r = s = u = 0;
 	return dirty;
 }
 
@@ -208,6 +208,7 @@ bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
 		done = compute_next (filter);
 		if (!done)
 		{
+			++r;
 			request ();
 			if (node->block_processor.half_full ())
 			{
@@ -236,7 +237,7 @@ bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
 		}
 	}
 	debug_assert (requests == 0);
-	a = p = q = 0;
+	a = p = 0;
 	if (!stopped)
 	{
 		node->block_processor.flush ();

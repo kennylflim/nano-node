@@ -19,6 +19,10 @@ void nano::lmdb::unchecked_store::put (nano::write_transaction const & transacti
 		auto status = store.put (transaction_a, tables::unchecked, key, info);
 		store.release_assert_success (status);
 	}
+	else
+	{
+		++dup;
+	}
 }
 
 bool nano::lmdb::unchecked_store::exists (nano::transaction const & transaction_a, nano::unchecked_key const & key)

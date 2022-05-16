@@ -62,9 +62,9 @@ private:
 	std::atomic<int> m{ 0 };
 	std::atomic<int> o{ 0 };
 	std::atomic<int> p{ 0 };
+	std::atomic<int> r{ 0 };
 	std::atomic<int> s{ 0 };
 	std::atomic<int> u{ 0 };
-	std::atomic<int> q{ 0 };
 };
 }
 }
