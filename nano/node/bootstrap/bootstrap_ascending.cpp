@@ -76,10 +76,28 @@ void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket
 	});
 }
 
-bool nano::bootstrap::bootstrap_ascending::compute_next ()
+bool nano::bootstrap::bootstrap_ascending::compute_next (uint32_t filter)
 {
-	next = next.number () + 1;
-	return load_next (node->store.tx_begin_read ());
+	auto done = false;
+	bool end = false;
+	while (!done)
+	{
+		next = next.number () + 1;
+		end = load_next (node->store.tx_begin_read ());
+		auto & miss_count = misses[next];
+		auto pass = miss_count <= filter;
+		if (pass)
+		{
+			++u;
+		}
+		else
+		{
+			++filtered;
+			++s;
+		}
+		done = end || pass;
+	}
+	return end;
 }
 
 bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & tx)
@@ -132,8 +150,7 @@ static int pass_number = 0;
 
 void nano::bootstrap::bootstrap_ascending::run ()
 {
-	auto start_count = node->ledger.cache.block_count.load ();
-	std::cerr << "!! Starting with:" << std::to_string (start_count) << ' ' << std::to_string (pass_number++) << "\n";
+	std::cerr << "!! Starting with:" << std::to_string (pass_number++) << "\n";
 	/*node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
 		auto this_l = this_w.lock ();
 		if (this_l == nullptr)
@@ -148,20 +165,47 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			this_l->queue.insert (destination);
 		}
 	});*/
-	fill_drain_queue ();
+	auto dirty = true;
+	uint32_t filter = 1;
+	while (dirty)
+	{
+		while (dirty)
+		{
+			dirty = run_pass (1);
+		}
+		filtered = 0;
+		dirty = run_pass (filter);
+		filter = filtered == 0 ? 1 : filter << 1;
+	}
 	stop ();
-	auto delta = node->ledger.cache.block_count - start_count;
-	std::cerr << "!! stopping delta:" << std::to_string (delta) << std::endl;
+	std::cerr << "!! stopping" << std::endl;
 }
 
-void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
+bool nano::bootstrap::bootstrap_ascending::run_pass (uint32_t filter)
+{
+	bool dirty = false;
+	auto start = std::chrono::steady_clock::now ();
+	auto start_count = node->ledger.cache.block_count.load ();
+	std::cerr << "Filter: " << std::to_string (filter) << std::endl;
+	fill_drain_queue (filter);
+	std::cerr << " o: " << std::to_string (o) << " m: " << std::to_string (m) << " s: " << std::to_string (s) << " u: " << std::to_string (u) << std::endl;
+	o = m = s = u = 0;
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::steady_clock::now () - start).count ();
+	uint64_t delta = node->ledger.cache.block_count.load () - start_count;
+	dirty = delta > 0;
+	std::cerr << "time(ms): " << std::to_string (ms) << " delta: " << std::to_string (delta) << " bps: " << std::to_string ((static_cast<double>(delta) / ms) * 1000.0) << std::endl;
+	return dirty;
+}
+
+bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
 {
 	bool done = false;
 	state = activity::account;
 	next = 0;
 	while (!stopped && !done)
 	{
-		done = compute_next ();
+		blocks = 0;
+		done = compute_next (filter);
 		if (!done)
 		{
 			request ();
@@ -171,7 +215,12 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 			}
 			std::unique_lock<nano::mutex> lock{ mutex };
 			condition.wait (lock, [this] () { return stopped || requests < 1; });
-			if (blocks >= cutoff)
+			auto overflow = blocks >= cutoff;
+			if (overflow || blocks == 0)
+			{
+				++misses[next];
+			}
+			if (overflow)
 			{
 				++o;
 				//requeue.insert (next);
@@ -180,12 +229,14 @@ void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 			{
 				++m;
 			}
-			blocks = 0;
+			else
+			{
+				misses[next] = 0;
+			}
 		}
 	}
 	debug_assert (requests == 0);
-	std::cerr << " o: " << std::to_string (o) << " m: " << std::to_string (m) << std::endl;
-	a = p = q = o = 0;
+	a = p = q = 0;
 	if (!stopped)
 	{
 		node->block_processor.flush ();

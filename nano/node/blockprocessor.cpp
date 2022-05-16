@@ -71,7 +71,6 @@ void nano::block_processor::stop ()
 
 void nano::block_processor::flush ()
 {
-	std::cerr << "flush\n";
 	node.checker.flush ();
 	flushing = true;
 	nano::unique_lock<nano::mutex> lock (mutex);

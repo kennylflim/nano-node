@@ -45,11 +45,14 @@ public:
 private:
 	void request ();
 	void request (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel);
-	bool compute_next ();
+	bool compute_next (uint32_t filter);
 	bool load_next (nano::transaction const & tx);
-	void fill_drain_queue ();
+	bool fill_drain_queue (uint32_t filter);
+	bool run_pass (uint32_t filter);
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	std::deque<std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>> sockets;
+	std::unordered_map<nano::account, uint32_t> misses;
+	size_t filtered{ 0 };
 	activity state{ activity::account };
 	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
@@ -59,6 +62,8 @@ private:
 	std::atomic<int> m{ 0 };
 	std::atomic<int> o{ 0 };
 	std::atomic<int> p{ 0 };
+	std::atomic<int> s{ 0 };
+	std::atomic<int> u{ 0 };
 	std::atomic<int> q{ 0 };
 };
 }
