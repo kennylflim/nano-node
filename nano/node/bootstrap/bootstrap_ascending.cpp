@@ -19,7 +19,6 @@ std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap
 
 void nano::bootstrap::bootstrap_ascending::request ()
 {
-	blocks = 0;
 	std::unique_lock<nano::mutex> lock{ mutex };
 	if (!sockets.empty ())
 	{
@@ -118,27 +117,8 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			}
 			else
 			{
-				state = activity::queue;
-				next = 1;
+				next = 0;
 				std::cerr << " p: " << p.load () << std::endl;
-				lock.unlock ();
-				result = load_next (tx);
-			}
-			break;
-		}
-		case activity::queue:
-		{
-			std::unique_lock<nano::mutex> lock{ mutex };
-			if (!queue.empty ())
-			{
-				++q;
-				auto item = queue.begin ();
-				next = *item;
-				queue.erase (item);
-			}
-			else
-			{
-				std::cerr << " q: " << q.load () << std::endl;
 				lock.unlock ();
 				result = true;
 			}
@@ -148,10 +128,13 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 	return result;
 }
 
+static int pass_number = 0;
+
 void nano::bootstrap::bootstrap_ascending::run ()
 {
-	std::cerr << "!! Starting\n";
-	node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
+	auto start_count = node->ledger.cache.block_count.load ();
+	std::cerr << "!! Starting with:" << std::to_string (start_count) << ' ' << std::to_string (pass_number++) << "\n";
+	/*node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
 		auto this_l = this_w.lock ();
 		if (this_l == nullptr)
 		{
@@ -164,66 +147,49 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->queue.insert (destination);
 		}
-	});
+	});*/
 	fill_drain_queue ();
 	stop ();
-	std::cerr << "!! stopping\n";
+	auto delta = node->ledger.cache.block_count - start_count;
+	std::cerr << "!! stopping delta:" << std::to_string (delta) << std::endl;
 }
 
 void nano::bootstrap::bootstrap_ascending::fill_drain_queue ()
 {
-	int pass = 0;
-	do
+	bool done = false;
+	state = activity::account;
+	next = 0;
+	while (!stopped && !done)
 	{
-		std::cerr << "Begin pass" << std::to_string (++pass) << std::endl;
-		bool done = false;
-		state = activity::account;
-		next = 0;
-		while (!stopped && !done)
+		done = compute_next ();
+		if (!done)
 		{
-			done = compute_next ();
-			if (!done)
+			request ();
+			if (node->block_processor.half_full ())
 			{
-				request ();
-				if (node->block_processor.half_full ())
-				{
-					node->block_processor.flush ();
-				}
-				std::unique_lock<nano::mutex> lock{ mutex };
-				condition.wait (lock, [this] () { return stopped || requests < 1; });
-				//if (blocks != 0)
-					//std::cerr << "b: " << blocks << " p: " << node->block_processor.size () << std::endl;
-				if (blocks >= cutoff)
-				{
-					requeue.insert (next);
-				}
-				blocks = 0;
+				node->block_processor.flush ();
 			}
-			else
-			{
-				auto flush = node->block_processor.size () > 0;
-				if (flush)
-				{
-					std::cerr << "trailing\n";
-					node->block_processor.flush ();
-					done = false;
-				}
-			}
-		}
-		debug_assert (requests == 0);
-		a = p = q = 0;
-		if (!stopped)
-		{
-			node->block_processor.flush ();
 			std::unique_lock<nano::mutex> lock{ mutex };
-			std::cerr << "requeueing: " << requeue.size () << std::endl;
-			queue.insert (requeue.begin (), requeue.end ());
-			decltype(requeue) discard;
-			requeue.swap (discard);
+			condition.wait (lock, [this] () { return stopped || requests < 1; });
+			if (blocks >= cutoff)
+			{
+				++o;
+				//requeue.insert (next);
+			}
+			if (blocks == 0)
+			{
+				++m;
+			}
+			blocks = 0;
 		}
-		std::cerr << "End pass\n";
-	} while (!stopped && !queue.empty ());
-	std::cerr << "stopped: " << stopped.load () << " queued: " << queue.empty () << std::endl;
+	}
+	debug_assert (requests == 0);
+	std::cerr << " o: " << std::to_string (o) << " m: " << std::to_string (m) << std::endl;
+	a = p = q = o = 0;
+	if (!stopped)
+	{
+		node->block_processor.flush ();
+	}
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel)

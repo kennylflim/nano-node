@@ -16,8 +16,7 @@ public:
 	enum class activity
 	{
 		account,
-		pending,
-		queue
+		pending
 	};
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
 	
@@ -54,11 +53,11 @@ private:
 	activity state{ activity::account };
 	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
-	std::unordered_set<nano::account> queue;
-	std::unordered_set<nano::account> requeue;
 	std::atomic<int> requests{ 0 };
 	static size_t constexpr cutoff = 256;
 	std::atomic<int> a{ 0 };
+	std::atomic<int> m{ 0 };
+	std::atomic<int> o{ 0 };
 	std::atomic<int> p{ 0 };
 	std::atomic<int> q{ 0 };
 };
