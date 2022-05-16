@@ -184,6 +184,8 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			filter = filtered == 0 ? 1 : filter << 1;
 		}
 	}
+	if (stopped)
+		std::cerr << "Externally stopped\n";
 	stop ();
 	std::cerr << "!! stopping" << std::endl;
 }
@@ -236,7 +238,7 @@ bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
 			}
 		}
 	}
-	debug_assert (requests == 0);
+	debug_assert (stopped || requests == 0);
 	a = p = 0;
 	if (!stopped)
 	{
