@@ -12,36 +12,80 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 	std::cerr << '\0';
 }
 
-std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap_ascending::shared ()
+void nano::bootstrap::bootstrap_ascending::producer_loop ()
 {
-	return std::static_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ());
+	while (!stopped && !load_next (node->store.tx_begin_read ()))
+	{
+		std::cerr << "queueing: " << next.to_account () << std::endl;
+		std::unique_lock<nano::mutex> lock{ mutex };
+		queue.push_back (next);
+		condition.notify_all ();
+		condition.wait (lock, [this] () { return requests == 0; });
+		node->block_processor.flush ();
+		next = next.number () + 1;
+	}
+	stop ();
+	/*while (!stopped)
+	{
+		condition.wait (lock, [this] () { return stopped || (requests == 0 && queue.size () < queue_max); });
+		if (!stopped)
+		{
+			lock.unlock ();
+			auto done = false;
+			while (!done)
+			{
+				done = load_any_next ();
+				if (!done)
+				{
+					lock.lock ();
+					lock.unlock ();
+				}
+				else
+				{
+					std::cerr << "producer end\n";
+				}
+			}
+			lock.lock ();
+		}
+	}*/
 }
 
-void nano::bootstrap::bootstrap_ascending::request ()
+void nano::bootstrap::bootstrap_ascending::consumer_loop ()
 {
-	std::unique_lock<nano::mutex> lock{ mutex };
+	while (!stopped)
+	{
+		std::unique_lock<nano::mutex> lock{ mutex };
+		condition.wait (lock, [this] () { return stopped || (requests < requests_max && !queue.empty ()); });
+		if (!stopped)
+		{
+			lock.unlock ();
+			connect_request ();
+			lock.lock ();
+		}
+	}
+}
+
+void nano::bootstrap::bootstrap_ascending::connect_request ()
+{
+	++requests;
 	if (!sockets.empty ())
 	{
-		//std::cerr << "pooled\n";
 		auto [socket, channel] = sockets.front ();
 		sockets.pop_front ();
-		lock.unlock ();
-		++requests;
 		request (socket, channel);
 	}
 	else
 	{
-		lock.unlock ();
 		auto endpoint = node->network.bootstrap_peer (true);
-		auto socket = std::make_shared<nano::client_socket> (*node);
 		if (endpoint != nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
 		{
-			++requests;
+			auto socket = std::make_shared<nano::client_socket> (*node);
 			socket->async_connect (endpoint,
 			[this_l = shared (), socket, endpoint] (boost::system::error_code const & ec) {
 				if (ec)
 				{
 					--this_l->requests;
+					this_l->condition.notify_all ();
 					return;
 				}
 				this_l->request (socket, std::make_shared<nano::transport::channel_tcp> (*this_l->node, socket));
@@ -50,19 +94,28 @@ void nano::bootstrap::bootstrap_ascending::request ()
 		else
 		{
 			std::cerr << "No endpoints\n";
+			--requests;
+			stop ();
 		}
 	}
 }
 
 void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel)
 {
+	nano::account account;
+	{
+		std::lock_guard<nano::mutex> lock{ mutex };
+		debug_assert (!queue.empty ());
+		account = queue.front ();
+		queue.pop_front ();
+	}
 	nano::hash_or_account start = next;
 	nano::account_info info;
-	if (!node->store.account.get (node->store.tx_begin_read (), next, info))
+	if (!node->store.account.get (node->store.tx_begin_read (), account, info))
 	{
 		start = info.head;
 	}
-	//std::cerr << "requesting: " << next.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
+	std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
 	nano::bulk_pull message{ node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
@@ -76,7 +129,22 @@ void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket
 	});
 }
 
-bool nano::bootstrap::bootstrap_ascending::compute_next (uint32_t filter)
+bool nano::bootstrap::bootstrap_ascending::load_any_next ()
+{
+	uint32_t filter = 1;
+	auto done = false;
+	auto end = false;
+	while (!done)
+	{
+		filtered = 0;
+		end = load_filter_next (filter);
+		filter <<= 1;
+		done = !end || filtered == 0;
+	}
+	return end;
+}
+
+bool nano::bootstrap::bootstrap_ascending::load_filter_next (uint32_t filter)
 {
 	auto done = false;
 	bool end = false;
@@ -84,16 +152,21 @@ bool nano::bootstrap::bootstrap_ascending::compute_next (uint32_t filter)
 	{
 		next = next.number () + 1;
 		end = load_next (node->store.tx_begin_read ());
-		auto & miss_count = misses[next];
-		auto pass = miss_count <= filter;
-		if (pass)
+		bool pass = false;
+		if (!end)
 		{
-			++u;
-		}
-		else
-		{
-			++filtered;
-			++s;
+			/*auto & miss_count = misses[next];
+			pass = miss_count <= filter;*/
+			pass = true;
+			if (pass)
+			{
+				++u;
+			}
+			else
+			{
+				++filtered;
+				++s;
+			}
 		}
 		done = end || pass;
 	}
@@ -108,7 +181,6 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 		case activity::account:
 		{
 			auto existing = node->store.account.begin (tx, next);
-			std::unique_lock<nano::mutex> lock{ mutex };
 			if (existing != node->store.account.end ())
 			{
 				++a;
@@ -119,7 +191,6 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 				state = activity::pending;
 				next = 1;
 				std::cerr << " a: " << a.load () << std::endl;
-				lock.unlock ();
 				result = load_next (tx);
 			}
 			break;
@@ -127,7 +198,6 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 		case activity::pending:
 		{
 			auto existing = node->store.pending.begin (tx, nano::pending_key{ next, 0 });
-			std::unique_lock<nano::mutex> lock{ mutex };
 			if (existing != node->store.pending.end ())
 			{
 				++p;
@@ -135,9 +205,9 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 			}
 			else
 			{
+				state = activity::account;
 				next = 0;
 				std::cerr << " p: " << p.load () << std::endl;
-				lock.unlock ();
 				result = true;
 			}
 			break;
@@ -152,113 +222,44 @@ void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "!! Starting with:" << std::to_string (pass_number++) << "\n";
 	node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
-		auto this_l = this_w.lock ();
+		/*auto this_l = this_w.lock ();
 		if (this_l == nullptr)
 		{
 			return;
 		}
 		auto account = this_l->node->ledger.account (tx, block.hash ());
 		debug_assert (this_l->misses.count (account) > 0);
-		this_l->misses[account] >>= 1;
-		//std::cerr << "done: " << block.hash ().to_string () << std::endl;
-		/*if (block.type () == nano::block_type::send || this_l->node->ledger.is_send (tx, static_cast<nano::state_block const &>(block)))
-		{
-			auto destination = this_l->node->ledger.block_destination (tx, block);
-			std::lock_guard<nano::mutex> lock{ this_l->mutex };
-			this_l->queue.insert (destination);
-		}*/
-		
+		this_l->misses[account] >>= 1;*/
 	});
-	auto dirty = true;
-	uint32_t filter = 1;
-	while (!stopped && dirty)
-	{
-		while (!stopped && dirty)
-		{
-			dirty = run_pass (1);
-		}
-		if (!stopped)
-		{
-			filtered = 0;
-			dirty = run_pass (filter);
-			filter = filtered == 0 ? 1 : filter << 1;
-		}
-	}
-	if (stopped)
-		std::cerr << "Externally stopped\n";
-	stop ();
+	std::thread producer{ [this] () {
+		producer_loop ();
+		std::cerr << "Exiting producer\n";
+	} };
+	std::thread consumer{ [this] () {
+		consumer_loop ();
+		std::cerr << "Exiting consumer\n";
+	}};
+	producer.join ();
+	consumer.join ();
+	
 	std::cerr << "!! stopping" << std::endl;
-}
-
-bool nano::bootstrap::bootstrap_ascending::run_pass (uint32_t filter)
-{
-	bool dirty = false;
-	auto start = std::chrono::steady_clock::now ();
-	auto start_count = node->ledger.cache.block_count.load ();
-	std::cerr << "Filter: " << std::to_string (filter) << std::endl;
-	fill_drain_queue (filter);
-	std::cerr << " o: " << std::to_string (o) << " r: " << std::to_string (r) << " m: " << std::to_string (m) << " s: " << std::to_string (s) << " u: " << std::to_string (u) << std::endl;
-	auto ms = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::steady_clock::now () - start).count ();
-	uint64_t delta = node->ledger.cache.block_count.load () - start_count;
-	dirty = delta > 0;
-	std::cerr << "time(ms): " << std::to_string (ms) << " delta: " << std::to_string (delta) << " bps: " << std::to_string ((static_cast<double>(delta) / ms) * 1000.0) << " miss rate: " << std::to_string (static_cast<double> (m) / r) << " dup: " << std::to_string (node->store.unchecked.dup) << std::endl;
-	m = o = r = s = u = 0;
-	return dirty;
-}
-
-bool nano::bootstrap::bootstrap_ascending::fill_drain_queue (uint32_t filter)
-{
-	bool done = false;
-	state = activity::account;
-	next = 0;
-	while (!stopped && !done)
-	{
-		blocks = 0;
-		done = compute_next (filter);
-		if (!done)
-		{
-			++r;
-			request ();
-			if (node->block_processor.half_full ())
-			{
-				node->block_processor.flush ();
-			}
-			std::unique_lock<nano::mutex> lock{ mutex };
-			condition.wait (lock, [this] () { return stopped || requests < 1; });
-			auto overflow = blocks >= cutoff;
-			++misses[next];
-			if (overflow)
-			{
-				++o;
-				//requeue.insert (next);
-			}
-			if (blocks == 0)
-			{
-				++m;
-			}
-		}
-	}
-	debug_assert (stopped || requests == 0);
-	a = p = 0;
-	if (!stopped)
-	{
-		node->block_processor.flush ();
-	}
 }
 
 void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
 	deserializer->read (*socket, [this_l = shared (), socket, channel, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+		debug_assert (!ec);
 		if (block == nullptr)
 		{
+			std::cerr << "stream end\n";
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->sockets.push_back (std::make_pair (socket, channel));
 			--this_l->requests;
 			this_l->condition.notify_all ();
 			return;
 		}
-		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
+		std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
 		this_l->read_block (socket, channel);
 		++this_l->blocks;
@@ -267,4 +268,9 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::soc
 
 void nano::bootstrap::bootstrap_ascending::get_information (boost::property_tree::ptree &)
 {
+}
+
+std::shared_ptr<nano::bootstrap::bootstrap_ascending> nano::bootstrap::bootstrap_ascending::shared ()
+{
+	return std::static_pointer_cast<nano::bootstrap::bootstrap_ascending> (shared_from_this ());
 }

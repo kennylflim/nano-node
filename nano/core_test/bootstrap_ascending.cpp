@@ -102,7 +102,7 @@ TEST (bootstrap_ascending, trace_base)
 				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
 				 .work (*system.work.generate (nano::dev::genesis->hash ()))
 				 .build_shared ();
-	auto send2 = builder.make_block ()
+	auto receive1 = builder.make_block ()
 				 .account (key.pub)
 				 .previous (0)
 				 .representative (nano::dev::genesis_key.pub)
@@ -114,13 +114,13 @@ TEST (bootstrap_ascending, trace_base)
 	std::cerr << "Key: " << key.pub.to_account () << std::endl;
 	std::cerr << "Genesis: " << nano::dev::genesis->hash ().to_string () << std::endl;
 	std::cerr << "send1: " << send1->hash ().to_string () << std::endl;
-	std::cerr << "send2: " << send2->hash ().to_string () << std::endl;
+	std::cerr << "receive1: " << receive1->hash ().to_string () << std::endl;
 	ASSERT_EQ (nano::process_result::progress, node0.process (*send1).code);
-	ASSERT_EQ (nano::process_result::progress, node0.process (*send2).code);
+	ASSERT_EQ (nano::process_result::progress, node0.process (*receive1).code);
 	auto & node1 = *system.add_node (flags);
 	std::cerr << "--------------- Start ---------------\n";
 	std::cerr << "node0: " << node0.network.endpoint () << std::endl;
 	std::cerr << "node1: " << node1.network.endpoint () << std::endl;
-	ASSERT_TIMELY (50s, node1.block (send2->hash ()) != nullptr);
+	ASSERT_TIMELY (50s, node1.block (receive1->hash ()) != nullptr);
 }
 
