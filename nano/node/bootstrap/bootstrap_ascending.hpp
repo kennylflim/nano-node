@@ -52,6 +52,7 @@ private:
 	void producer_loop ();
 	void consumer_loop ();
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
+	void producer_pass ();
 	std::deque<std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>> sockets;
 	std::unordered_map<nano::account, uint32_t> misses;
 	size_t filtered{ 0 };

@@ -12,7 +12,7 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 	std::cerr << '\0';
 }
 
-void nano::bootstrap::bootstrap_ascending::producer_loop ()
+void nano::bootstrap::bootstrap_ascending::producer_pass ()
 {
 	while (!stopped && !load_next (node->store.tx_begin_read ()))
 	{
@@ -20,9 +20,17 @@ void nano::bootstrap::bootstrap_ascending::producer_loop ()
 		std::unique_lock<nano::mutex> lock{ mutex };
 		queue.push_back (next);
 		condition.notify_all ();
-		condition.wait (lock, [this] () { return requests == 0; });
+		condition.wait (lock, [this] () { return stopped || requests == 0; });
 		node->block_processor.flush ();
 		next = next.number () + 1;
+	}
+}
+
+void nano::bootstrap::bootstrap_ascending::producer_loop ()
+{
+	while (!stopped)
+	{
+		producer_pass ();
 	}
 	stop ();
 	/*while (!stopped)
@@ -249,10 +257,9 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::soc
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
 	deserializer->read (*socket, [this_l = shared (), socket, channel, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
-		debug_assert (!ec);
 		if (block == nullptr)
 		{
-			std::cerr << "stream end\n";
+			//std::cerr << "stream end\n";
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->sockets.push_back (std::make_pair (socket, channel));
 			--this_l->requests;

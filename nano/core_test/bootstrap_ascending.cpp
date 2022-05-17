@@ -89,6 +89,7 @@ TEST (bootstrap_ascending, account_inductive)
 TEST (bootstrap_ascending, trace_base)
 {
 	nano::node_flags flags;
+	flags.disable_legacy_bootstrap = true;
 	nano::system system{ 1, nano::transport::transport_type::tcp, flags };
 	auto & node0 = *system.nodes[0];
 	nano::keypair key;
@@ -117,7 +118,7 @@ TEST (bootstrap_ascending, trace_base)
 	std::cerr << "receive1: " << receive1->hash ().to_string () << std::endl;
 	ASSERT_EQ (nano::process_result::progress, node0.process (*send1).code);
 	ASSERT_EQ (nano::process_result::progress, node0.process (*receive1).code);
-	auto & node1 = *system.add_node (flags);
+	auto & node1 = *system.add_node ();
 	std::cerr << "--------------- Start ---------------\n";
 	std::cerr << "node0: " << node0.network.endpoint () << std::endl;
 	std::cerr << "node1: " << node1.network.endpoint () << std::endl;
