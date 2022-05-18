@@ -118,7 +118,7 @@ void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket
 		account = queue.front ();
 		queue.pop_front ();
 	}
-	nano::hash_or_account start = next;
+	nano::hash_or_account start = account;
 	nano::account_info info;
 	if (!node->store.account.get (node->store.tx_begin_read (), account, info))
 	{
@@ -267,7 +267,7 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::soc
 			this_l->condition.notify_all ();
 			return;
 		}
-		std::cerr << "block: " << block->hash ().to_string () << std::endl;
+		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
 		this_l->read_block (socket, channel);
 		++this_l->blocks;
