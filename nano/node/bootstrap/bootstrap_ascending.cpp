@@ -14,16 +14,17 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 
 bool nano::bootstrap::bootstrap_ascending::producer_pass ()
 {
+	bool nothing_found = true;
 	while (!stopped && !load_next (node->store.tx_begin_read ()))
 	{
-		std::cerr << "queueing: " << next.to_account () << std::endl;
+		nothing_found = false;
+		//std::cerr << "queueing: " << next.to_account () << std::endl;
 		std::unique_lock<nano::mutex> lock{ mutex };
 		queue.push_back (next);
 		condition.notify_all ();
-		condition.wait (lock, [this] () { return stopped || (queue.empty () && requests == 0); });
 		next = next.number () + 1;
 	}
-	return true;
+	return nothing_found;
 }
 
 void nano::bootstrap::bootstrap_ascending::producer_loop ()
@@ -32,6 +33,8 @@ void nano::bootstrap::bootstrap_ascending::producer_loop ()
 	while (!done)
 	{
 		done = producer_pass ();
+		nano::unique_lock<nano::mutex> lock{ mutex };
+		condition.wait (lock, [this] () { return stopped || (queue.empty () && requests == 0); });
 	}
 	stop ();
 	/*while (!stopped)
@@ -124,7 +127,7 @@ void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket
 	{
 		start = info.head;
 	}
-	std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
+	//std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
 	nano::bulk_pull message{ node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
