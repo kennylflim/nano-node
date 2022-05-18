@@ -12,19 +12,38 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 	std::cerr << '\0';
 }
 
-bool nano::bootstrap::bootstrap_ascending::producer_pass ()
+bool nano::bootstrap::bootstrap_ascending::producer_filtered_pass (uint32_t filter)
 {
+	int skipped = 0, used = 0;
 	bool nothing_found = true;
 	while (!stopped && !load_next (node->store.tx_begin_read ()))
 	{
-		nothing_found = false;
-		//std::cerr << "queueing: " << next.to_account () << std::endl;
-		std::unique_lock<nano::mutex> lock{ mutex };
-		queue.push_back (next);
-		condition.notify_all ();
+		if (misses[next]++ < filter)
+		{
+			++used;
+			nothing_found = false;
+			queue_next ();
+		}
+		else
+		{
+			++skipped;
+		}
 		next = next.number () + 1;
 	}
+	std::cerr << "s: " << std::to_string (skipped) << " u: " << std::to_string (used) << std::endl;
 	return nothing_found;
+}
+
+bool nano::bootstrap::bootstrap_ascending::producer_pass ()
+{
+	return producer_filtered_pass (std::numeric_limits<uint32_t>::max ());
+}
+
+void nano::bootstrap::bootstrap_ascending::queue_next ()
+{
+	std::unique_lock<nano::mutex> lock{ mutex };
+	queue.push_back (next);
+	condition.notify_all ();
 }
 
 void nano::bootstrap::bootstrap_ascending::producer_loop ()
@@ -139,50 +158,6 @@ void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket
 		// Initiate reading blocks
 		this_l->read_block (socket, channel);
 	});
-}
-
-bool nano::bootstrap::bootstrap_ascending::load_any_next ()
-{
-	uint32_t filter = 1;
-	auto done = false;
-	auto end = false;
-	while (!done)
-	{
-		filtered = 0;
-		end = load_filter_next (filter);
-		filter <<= 1;
-		done = !end || filtered == 0;
-	}
-	return end;
-}
-
-bool nano::bootstrap::bootstrap_ascending::load_filter_next (uint32_t filter)
-{
-	auto done = false;
-	bool end = false;
-	while (!done)
-	{
-		next = next.number () + 1;
-		end = load_next (node->store.tx_begin_read ());
-		bool pass = false;
-		if (!end)
-		{
-			/*auto & miss_count = misses[next];
-			pass = miss_count <= filter;*/
-			pass = true;
-			if (pass)
-			{
-				++u;
-			}
-			else
-			{
-				++filtered;
-				++s;
-			}
-		}
-		done = end || pass;
-	}
-	return end;
 }
 
 bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & tx)
