@@ -14,6 +14,7 @@ bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id
 
 bool nano::bootstrap::bootstrap_ascending::producer_filtered_pass (uint32_t filter)
 {
+	std::cerr << "filter: " << std::to_string (filter) << std::endl;
 	int skipped = 0, used = 0;
 	bool nothing_found = true;
 	while (!stopped && !load_next (node->store.tx_begin_read ()))
@@ -36,7 +37,14 @@ bool nano::bootstrap::bootstrap_ascending::producer_filtered_pass (uint32_t filt
 
 bool nano::bootstrap::bootstrap_ascending::producer_pass ()
 {
-	return producer_filtered_pass (std::numeric_limits<uint32_t>::max ());
+	for (auto i = 1; !stopped && i < 64; i <<= 1)
+	{
+		if (!producer_filtered_pass (i))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 void nano::bootstrap::bootstrap_ascending::queue_next ()
