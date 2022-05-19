@@ -16,13 +16,14 @@ bool nano::bootstrap::bootstrap_ascending::producer_filtered_pass (uint32_t filt
 {
 	std::cerr << "filter: " << std::to_string (filter) << std::endl;
 	int skipped = 0, used = 0;
-	bool nothing_found = true;
+	p = a = 0;
+	bool end = true;
 	while (!stopped && !load_next (node->store.tx_begin_read ()))
 	{
 		if (misses[next]++ < filter)
 		{
 			++used;
-			nothing_found = false;
+			end = false;
 			queue_next ();
 		}
 		else
@@ -32,17 +33,57 @@ bool nano::bootstrap::bootstrap_ascending::producer_filtered_pass (uint32_t filt
 		next = next.number () + 1;
 	}
 	std::cerr << "s: " << std::to_string (skipped) << " u: " << std::to_string (used) << std::endl;
-	return nothing_found;
+	return end;
 }
 
-bool nano::bootstrap::bootstrap_ascending::producer_pass ()
+void nano::bootstrap::bootstrap_ascending::dump_miss_histogram ()
 {
-	for (auto i = 1; !stopped && i < 64; i <<= 1)
+	std::vector<int> histogram;
+	std::lock_guard<nano::mutex> lock{ mutex };
+	for (auto const &[account, count]: misses)
+	{
+		if (count >= histogram.size ())
+		{
+			histogram.resize (count + 1);
+		}
+		++histogram[count];
+	}
+	for (auto i: histogram)
+	{
+		std::cerr << std::to_string (i) << ' ';
+	}
+	std::cerr << std::endl;
+}
+
+bool nano::bootstrap::bootstrap_ascending::producer_throttled_pass ()
+{
+	/*for (auto i = 1; !stopped && i < 64; i <<= 1)
 	{
 		if (!producer_filtered_pass (i))
 		{
 			return false;
 		}
+		//dump_miss_histogram ();
+	}*/
+}
+
+bool nano::bootstrap::bootstrap_ascending::producer_pass ()
+{
+	dirty = true;
+	while (!stopped && dirty)
+	{
+		dirty = false;
+		//producer_throttled_pass ();
+		producer_filtered_pass (std::numeric_limits<uint32_t>::max ());
+		std::unique_lock<nano::mutex> lock{ mutex };
+		condition.wait (lock, [this] () { return stopped || (requests == 0 && queue.empty ()); });
+		lock.unlock ();
+		//std::cerr << "flushing\n";
+		if (!stopped)
+		{
+			node->block_processor.flush ();
+		}
+		std::cerr << "dirty: " << std::to_string (dirty) << std::endl;
 	}
 	return true;
 }
@@ -60,8 +101,6 @@ void nano::bootstrap::bootstrap_ascending::producer_loop ()
 	while (!done)
 	{
 		done = producer_pass ();
-		nano::unique_lock<nano::mutex> lock{ mutex };
-		condition.wait (lock, [this] () { return stopped || (queue.empty () && requests == 0); });
 	}
 	stop ();
 	/*while (!stopped)
@@ -217,14 +256,17 @@ void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "!! Starting with:" << std::to_string (pass_number++) << "\n";
 	node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
-		/*auto this_l = this_w.lock ();
+		auto this_l = this_w.lock ();
 		if (this_l == nullptr)
 		{
 			return;
 		}
 		auto account = this_l->node->ledger.account (tx, block.hash ());
+		std::lock_guard<nano::mutex> lock{ this_l->mutex };
 		debug_assert (this_l->misses.count (account) > 0);
-		this_l->misses[account] >>= 1;*/
+		this_l->misses[account] >>= 1;
+		//std::cerr << "marking\n";
+		this_l->dirty = true;
 	});
 	std::thread producer{ [this] () {
 		producer_loop ();

@@ -53,6 +53,8 @@ private:
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	bool producer_pass ();
 	bool producer_filtered_pass (uint32_t filter);
+	bool producer_throttled_pass ();
+	void dump_miss_histogram ();
 	std::deque<std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>> sockets;
 	std::unordered_map<nano::account, uint32_t> misses;
 	size_t filtered{ 0 };
@@ -61,12 +63,13 @@ private:
 	uint64_t blocks{ 0 };
 	std::atomic<int> requests{ 0 };
 	static constexpr int requests_max = 1;
-	static size_t constexpr cutoff = 256;
+	static size_t constexpr cutoff = 1;
 	std::atomic<int> a{ 0 };
 	std::atomic<int> m{ 0 };
 	std::atomic<int> o{ 0 };
 	std::atomic<int> p{ 0 };
 	std::atomic<int> r{ 0 };
+	std::atomic<bool> dirty{ false };
 	std::deque<nano::account> queue;
 	static constexpr size_t queue_max = 1;
 };
