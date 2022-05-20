@@ -264,9 +264,9 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		}
 		auto account = this_l->node->ledger.account (tx, block.hash ());
 		std::lock_guard<nano::mutex> lock{ this_l->mutex };
-		debug_assert (this_l->misses.count (account) > 0);
-		this_l->misses[account] >>= 1;
-		this_l->queue.push_back (account);
+		//debug_assert (this_l->misses.count (account) > 0);
+		//this_l->misses[account] >>= 1;
+		//this_l->queue.push_back (account);
 		this_l->condition.notify_all ();
 		//std::cerr << "marking\n";
 		this_l->dirty = true;
