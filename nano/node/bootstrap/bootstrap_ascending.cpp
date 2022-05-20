@@ -162,6 +162,7 @@ void nano::bootstrap::bootstrap_ascending::connect_request ()
 			[this_l = shared (), socket, endpoint] (boost::system::error_code const & ec) {
 				if (ec)
 				{
+					std::lock_guard<nano::mutex> lock{ this_l->mutex };
 					--this_l->requests;
 					this_l->condition.notify_all ();
 					return;
@@ -173,6 +174,7 @@ void nano::bootstrap::bootstrap_ascending::connect_request ()
 		{
 			std::cerr << "No endpoints\n";
 			--requests;
+			condition.notify_all ();
 			stop ();
 		}
 	}
@@ -180,13 +182,12 @@ void nano::bootstrap::bootstrap_ascending::connect_request ()
 
 void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel)
 {
-	nano::account account;
-	{
-		std::lock_guard<nano::mutex> lock{ mutex };
-		debug_assert (!queue.empty ());
-		account = queue.front ();
-		queue.pop_front ();
-	}
+	std::unique_lock<nano::mutex> lock{ mutex };
+	debug_assert (!queue.empty ());
+	auto account = queue.front ();
+	queue.pop_front ();
+	condition.notify_all ();
+	lock.unlock ();
 	nano::hash_or_account start = account;
 	nano::account_info info;
 	if (!node->store.account.get (node->store.tx_begin_read (), account, info))
@@ -265,6 +266,8 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		std::lock_guard<nano::mutex> lock{ this_l->mutex };
 		debug_assert (this_l->misses.count (account) > 0);
 		this_l->misses[account] >>= 1;
+		this_l->queue.push_back (account);
+		this_l->condition.notify_all ();
 		//std::cerr << "marking\n";
 		this_l->dirty = true;
 	});
