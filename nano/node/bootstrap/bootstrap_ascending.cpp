@@ -22,6 +22,7 @@ auto nano::bootstrap::bootstrap_ascending::queue::pop_front () -> std::shared_pt
 {
 	std::lock_guard<nano::mutex> lock{ mutex };
 	auto result = accounts.front ();
+	std::cerr << "Popping: " << result->account ().to_account () << std::endl;
 	accounts.pop_front ();
 	condition.notify_all ();
 	return result;
@@ -53,6 +54,12 @@ void nano::bootstrap::bootstrap_ascending::queue::clear_queue ()
 	debug_assert (bootstrap.stopped);
 	std::lock_guard<nano::mutex> lock{ mutex };
 	accounts.clear ();
+	condition.notify_all ();
+}
+
+void nano::bootstrap::bootstrap_ascending::queue::notify ()
+{
+	std::lock_guard<nano::mutex> lock{ mutex };
 	condition.notify_all ();
 }
 
@@ -140,6 +147,7 @@ bool nano::bootstrap::bootstrap_ascending::producer_pass ()
 void nano::bootstrap::bootstrap_ascending::queue_next ()
 {
 	std::unique_lock<nano::mutex> lock{ mutex };
+	std::cerr << "Queueing: " << next.to_account () << std::endl;
 	queue.push_back (next);
 	condition.notify_all ();
 }
@@ -239,10 +247,10 @@ void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket
 	message.start = start;
 	message.end = 0;
 	message.count = cutoff;
-	channel->send (message, [this_l = shared (), socket, channel, node = node] (boost::system::error_code const &, std::size_t) {
+	channel->send (message, [this_l = shared (), socket, channel, node = node, request] (boost::system::error_code const &, std::size_t) {
 		//std::cerr << "callback\n";
 		// Initiate reading blocks
-		this_l->read_block (socket, channel);
+		this_l->read_block (socket, channel, request);
 	});
 }
 
@@ -291,6 +299,12 @@ bool nano::bootstrap::bootstrap_ascending::load_next (nano::transaction const & 
 
 static int pass_number = 0;
 
+void nano::bootstrap::bootstrap_ascending::stop ()
+{
+	bootstrap_attempt::stop ();
+	queue.notify ();
+}
+
 void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "!! Starting with:" << std::to_string (pass_number++) << "\n";
@@ -323,10 +337,10 @@ void nano::bootstrap::bootstrap_ascending::run ()
 	std::cerr << "!! stopping" << std::endl;
 }
 
-void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel)
+void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel, std::shared_ptr<queue::request> request)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
-	deserializer->read (*socket, [this_l = shared (), socket, channel, node = node] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+	deserializer->read (*socket, [this_l = shared (), socket, channel, node = node, request] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
 			//std::cerr << "stream end\n";
@@ -337,7 +351,7 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<nano::soc
 		}
 		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
 		node->block_processor.add (block);
-		this_l->read_block (socket, channel);
+		this_l->read_block (socket, channel, request);
 		++this_l->blocks;
 	} );
 }

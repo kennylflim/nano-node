@@ -16,6 +16,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 {
 	class queue
 	{
+	public:
 		class request
 		{
 		public:
@@ -32,6 +33,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 				std::lock_guard<nano::mutex> lock{ mutex };
 				--bootstrap->queue.requests;
 				bootstrap->queue.condition.notify_all ();
+				std::cerr << "Completed: " << account_m.to_account () << std::endl;;
 			}
 			nano::account account ()
 			{
@@ -55,6 +57,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 		/// Wait for there to be space for an additional request
 		bool wait_available_request () const;
 		void clear_queue ();
+		void notify ();
 	private:
 		mutable nano::mutex mutex;
 		mutable nano::condition_variable condition;
@@ -71,8 +74,9 @@ public:
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
 	
 	void run () override;
+	void stop () override;
 	void get_information (boost::property_tree::ptree &) override;
-	void read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel);
+	void read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel, std::shared_ptr<queue::request> request);
 
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t const incremental_id_a, std::string const & id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
 	bootstrap_ascending{ node_a, incremental_id_a, id_a }
