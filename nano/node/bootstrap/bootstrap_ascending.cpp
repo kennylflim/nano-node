@@ -6,6 +6,12 @@
 
 using namespace std::chrono_literals;
 
+bool nano::bootstrap::bootstrap_ascending::wait_empty_requests ()
+{
+	std::unique_lock<nano::mutex> lock{ mutex };
+	condition.wait (lock, [this] () { return stopped || (requests == 0 && queue.empty ()); });
+}
+
 nano::bootstrap::bootstrap_ascending::bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a) :
 bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id_a }
 {
@@ -75,9 +81,7 @@ bool nano::bootstrap::bootstrap_ascending::producer_pass ()
 		dirty = false;
 		//producer_throttled_pass ();
 		producer_filtered_pass (std::numeric_limits<uint32_t>::max ());
-		std::unique_lock<nano::mutex> lock{ mutex };
-		condition.wait (lock, [this] () { return stopped || (requests == 0 && queue.empty ()); });
-		lock.unlock ();
+		wait_empty_requests ();
 		//std::cerr << "flushing\n";
 		if (!stopped)
 		{
