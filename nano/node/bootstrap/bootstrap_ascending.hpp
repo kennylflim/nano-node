@@ -14,6 +14,54 @@ namespace bootstrap
 {
 class bootstrap_ascending : public nano::bootstrap_attempt
 {
+	class queue
+	{
+		class request
+		{
+		public:
+			request (std::shared_ptr<bootstrap_ascending> bootstrap, nano::account const & account) :
+				bootstrap{ bootstrap },
+				account_m{ account }
+			{
+				std::lock_guard<nano::mutex> lock{ mutex };
+				++bootstrap->queue.requests;
+				bootstrap->queue.condition.notify_all ();
+			}
+			~request ()
+			{
+				std::lock_guard<nano::mutex> lock{ mutex };
+				--bootstrap->queue.requests;
+				bootstrap->queue.condition.notify_all ();
+			}
+			nano::account account ()
+			{
+				return account_m;
+			}
+		private:
+			nano::mutex mutex;
+			std::shared_ptr<bootstrap_ascending> bootstrap;
+			nano::account account_m;
+		};
+	public:
+		queue (bootstrap_ascending & bootstrap);
+		void push_back (nano::account const & account);
+		std::shared_ptr<request> pop_front ();
+		/// Waits for there to be no outstanding network requests
+		/// Returns true if the function returns and there are still requests outstanding
+		bool wait_empty_requests () const;
+		/// Waits for there to be an an item in the queue to be popped
+		/// Returns true if the fuction returns and there are no items in the queue
+		bool wait_available_queue () const;
+		/// Wait for there to be space for an additional request
+		bool wait_available_request () const;
+		void clear_queue ();
+	private:
+		mutable nano::mutex mutex;
+		mutable nano::condition_variable condition;
+		std::deque<std::shared_ptr<request>> accounts;
+		std::atomic<int> requests{ 0 };
+		bootstrap_ascending & bootstrap;
+	};
 public:
 	enum class activity
 	{
@@ -25,8 +73,6 @@ public:
 	void run () override;
 	void get_information (boost::property_tree::ptree &) override;
 	void read_block (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel);
-	nano::account pop_front ();
-	bool wait_empty_requests ();
 
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t const incremental_id_a, std::string const & id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
 	bootstrap_ascending{ node_a, incremental_id_a, id_a }
@@ -63,7 +109,6 @@ private:
 	activity state{ activity::account };
 	nano::account next{ 1 };
 	uint64_t blocks{ 0 };
-	std::atomic<int> requests{ 0 };
 	static constexpr int requests_max = 1;
 	static size_t constexpr cutoff = 1;
 	std::atomic<int> a{ 0 };
@@ -72,8 +117,8 @@ private:
 	std::atomic<int> p{ 0 };
 	std::atomic<int> r{ 0 };
 	std::atomic<bool> dirty{ false };
-	std::deque<nano::account> queue;
 	static constexpr size_t queue_max = 1;
+	queue queue;
 };
 }
 }
