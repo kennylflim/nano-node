@@ -6,6 +6,16 @@
 
 using namespace std::chrono_literals;
 
+nano::account nano::bootstrap::bootstrap_ascending::pop_front ()
+{
+	std::lock_guard<nano::mutex> lock{ mutex };
+	debug_assert (!queue.empty ());
+	auto account = queue.front ();
+	queue.pop_front ();
+	condition.notify_all ();
+	return account;
+}
+
 bool nano::bootstrap::bootstrap_ascending::wait_empty_requests ()
 {
 	std::unique_lock<nano::mutex> lock{ mutex };
@@ -186,12 +196,7 @@ void nano::bootstrap::bootstrap_ascending::connect_request ()
 
 void nano::bootstrap::bootstrap_ascending::request (std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel)
 {
-	std::unique_lock<nano::mutex> lock{ mutex };
-	debug_assert (!queue.empty ());
-	auto account = queue.front ();
-	queue.pop_front ();
-	condition.notify_all ();
-	lock.unlock ();
+	nano::account account = pop_front ();
 	nano::hash_or_account start = account;
 	nano::account_info info;
 	if (!node->store.account.get (node->store.tx_begin_read (), account, info))
