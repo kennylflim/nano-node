@@ -4,8 +4,6 @@
 
 #include <nano/node/node.hpp>
 
-#include <boost/format.hpp>
-
 using namespace std::chrono_literals;
 
 void nano::bootstrap::bootstrap_ascending::push_back (nano::account const & account)
@@ -70,7 +68,7 @@ nano::bootstrap::bootstrap_ascending::bootstrap_ascending (std::shared_ptr<nano:
 
 bool nano::bootstrap::bootstrap_ascending::producer::filtered_pass (uint32_t filter)
 {
-	std::cerr << "filter: " << std::to_string (filter) << std::endl;
+	std::cerr << boost::str (boost::format ("filter: %1% on %2%\n") % std::to_string (filter) % bootstrap.node->network.port);
 	int skipped = 0, used = 0;
 	p = a = 0;
 	bool end = true;
@@ -86,7 +84,6 @@ bool nano::bootstrap::bootstrap_ascending::producer::filtered_pass (uint32_t fil
 		{
 			++skipped;
 		}
-		next = next.number () + 1;
 	}
 	std::cerr << "s: " << std::to_string (skipped) << " u: " << std::to_string (used) << std::endl;
 	return end;
@@ -208,17 +205,17 @@ void nano::bootstrap::bootstrap_ascending::consumer::connect_request ()
 		auto endpoint = bootstrap.node->network.bootstrap_peer (true);
 		if (endpoint != nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
 		{
-			std::cerr << "connecting to: " << endpoint << std::endl;
+			std::cerr << boost::str (boost::format ("connecting to: %1%\n") % endpoint);
 			auto socket = std::make_shared<nano::client_socket> (*bootstrap.node);
 			socket->async_connect (endpoint,
 			[this_l = bootstrap.shared (), socket, endpoint] (boost::system::error_code const & ec) {
 				if (ec)
 				{
-					std::cerr << "connect failed to: " << endpoint << std::endl;
+					std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
 					std::lock_guard<nano::mutex> lock{ this_l->mutex };
 					return;
 				}
-				std::cerr << "connected to: " << endpoint << std::endl;
+				std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
 				this_l->consumer.request (socket, std::make_shared<nano::transport::channel_tcp> (*this_l->node, socket));
 			});
 		}
@@ -261,45 +258,31 @@ void nano::bootstrap::bootstrap_ascending::consumer::request (std::shared_ptr<na
 
 bool nano::bootstrap::bootstrap_ascending::producer::load_next (nano::transaction const & tx)
 {
-	bool result = false;
-	switch (state)
+	next = next.number () + 1;
+	std::cerr << boost::str (boost::format ("Searching for: %1%\n") % next.to_account ());
+	auto existing_account = bootstrap.node->store.account.begin (tx, next);
+	auto existing_pending = bootstrap.node->store.pending.begin (tx, nano::pending_key{ next, 0 });
+	if (existing_account == bootstrap.node->store.account.end () && existing_pending == bootstrap.node->store.pending.end ())
 	{
-		case activity::account:
-		{
-			auto existing = bootstrap.node->store.account.begin (tx, next);
-			if (existing != bootstrap.node->store.account.end ())
-			{
-				++a;
-				next = existing->first;
-			}
-			else
-			{
-				state = activity::pending;
-				next = 1;
-				std::cerr << " a: " << a.load () << std::endl;
-				result = load_next (tx);
-			}
-			break;
-		}
-		case activity::pending:
-		{
-			auto existing = bootstrap.node->store.pending.begin (tx, nano::pending_key{ next, 0 });
-			if (existing != bootstrap.node->store.pending.end ())
-			{
-				++p;
-				next = existing->first.key ();
-			}
-			else
-			{
-				state = activity::account;
-				next = 0;
-				std::cerr << " p: " << p.load () << std::endl;
-				result = true;
-			}
-			break;
-		}
+		std::cerr << boost::str (boost::format ("Pass end: a: %1% p: %2%\n") % a.load () % p.load ());
+		return true;
 	}
-	return result;
+	if (existing_account == bootstrap.node->store.account.end () || (existing_pending != bootstrap.node->store.pending.end () && existing_pending->first.key () < existing_account->first))
+	{
+		debug_assert (existing_pending != bootstrap.node->store.pending.end ());
+		++p;
+		next = existing_pending->first.key ();
+		std::cerr << boost::str (boost::format ("Next from pending: %1%\n") % next.to_string ());
+		return false;
+	}
+	else
+	{
+		debug_assert (existing_account != bootstrap.node->store.account.end ());
+		++a;
+		next = existing_account->first;
+		std::cerr << boost::str (boost::format ("Next from account: %1%\n") % next.to_account ());
+		return false;
+	}
 }
 
 static int pass_number = 0;

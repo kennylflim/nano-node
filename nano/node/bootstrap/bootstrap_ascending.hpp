@@ -4,6 +4,8 @@
 
 #include <thread>
 
+#include <boost/format.hpp>
+
 namespace nano
 {
 namespace transport
@@ -30,7 +32,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 			std::lock_guard<nano::mutex> lock{ mutex };
 			--bootstrap->requests;
 			bootstrap->condition.notify_all ();
-			std::cerr << "Request completed: " << account_m.to_account () << std::endl;;
+			std::cerr << boost::str (boost::format ("Request completed: %1%\n") % account_m.to_account ());
 		}
 		nano::account account ()
 		{
@@ -43,11 +45,6 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 	};
 	class producer
 	{
-		enum class activity
-		{
-			account,
-			pending
-		};
 	public:
 		producer (bootstrap_ascending & bootstrap) :
 			bootstrap{ bootstrap }
@@ -61,8 +58,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 		void queue_next ();
 		std::atomic<int> a{ 0 };
 		std::atomic<int> p{ 0 };
-		activity state{ activity::account };
-		nano::account next{ 1 };
+		nano::account next{ 0 };
 		bootstrap_ascending & bootstrap;
 	};
 	class consumer
