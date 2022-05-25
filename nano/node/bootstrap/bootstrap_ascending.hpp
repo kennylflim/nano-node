@@ -30,7 +30,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 			std::lock_guard<nano::mutex> lock{ mutex };
 			--bootstrap->requests;
 			bootstrap->condition.notify_all ();
-			std::cerr << "Completed: " << account_m.to_account () << std::endl;;
+			std::cerr << "Request completed: " << account_m.to_account () << std::endl;;
 		}
 		nano::account account ()
 		{

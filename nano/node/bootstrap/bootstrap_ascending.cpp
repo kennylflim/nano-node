@@ -4,6 +4,8 @@
 
 #include <nano/node/node.hpp>
 
+#include <boost/format.hpp>
+
 using namespace std::chrono_literals;
 
 void nano::bootstrap::bootstrap_ascending::push_back (nano::account const & account)
@@ -17,7 +19,7 @@ auto nano::bootstrap::bootstrap_ascending::pop_front () -> std::shared_ptr<reque
 {
 	std::lock_guard<nano::mutex> lock{ mutex };
 	auto result = accounts.front ();
-	std::cerr << "Popping: " << result->account ().to_account () << std::endl;
+	std::cerr << boost::str (boost::format ("Popping: %1%\n") % result->account ().to_account ());
 	accounts.pop_front ();
 	condition.notify_all ();
 	return result;
@@ -26,7 +28,7 @@ auto nano::bootstrap::bootstrap_ascending::pop_front () -> std::shared_ptr<reque
 bool nano::bootstrap::bootstrap_ascending::wait_empty_requests ()
 {
 	std::unique_lock<nano::mutex> lock{ mutex };
-	condition.wait (lock, [this] () { return stopped || (accounts.empty () && requests == 0); });
+	condition.wait (lock, [this] () { return stopped || requests == 0; });
 	return stopped;
 }
 
@@ -40,7 +42,7 @@ bool nano::bootstrap::bootstrap_ascending::wait_available_queue ()
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
 {
 	std::unique_lock<nano::mutex> lock{ mutex };
-	condition.wait (lock, [this] () { return stopped || (accounts.size () + requests < 1); } );
+	condition.wait (lock, [this] () { return stopped ||  requests < 1; } );
 	return stopped;
 }
 
@@ -135,14 +137,14 @@ bool nano::bootstrap::bootstrap_ascending::producer::pass ()
 		{
 			bootstrap.node->block_processor.flush ();
 		}
-		std::cerr << "dirty: " << std::to_string (bootstrap.dirty) << std::endl;
+		std::cerr << boost::str (boost::format ("dirty: %1%\n") % std::to_string (bootstrap.dirty));
 	}
 	return true;
 }
 
 void nano::bootstrap::bootstrap_ascending::producer::queue_next ()
 {
-	std::cerr << "Queueing: " << next.to_account () << std::endl;
+	std::cerr << boost::str (boost::format ("Queueing: %1%\n") % next.to_account ());
 	bootstrap.push_back (next);
 	bootstrap.condition.notify_all ();
 }
@@ -212,6 +214,7 @@ void nano::bootstrap::bootstrap_ascending::consumer::connect_request ()
 			[this_l = bootstrap.shared (), socket, endpoint] (boost::system::error_code const & ec) {
 				if (ec)
 				{
+					std::cerr << "connect failed to: " << endpoint << std::endl;
 					std::lock_guard<nano::mutex> lock{ this_l->mutex };
 					return;
 				}
@@ -231,6 +234,7 @@ void nano::bootstrap::bootstrap_ascending::consumer::request (std::shared_ptr<na
 {
 	if (bootstrap.wait_available_queue ())
 	{
+		std::cerr << "Empty queue\n";
 		return;
 	}
 	auto request = bootstrap.pop_front ();
@@ -338,13 +342,13 @@ void nano::bootstrap::bootstrap_ascending::consumer::read_block (std::shared_ptr
 	deserializer->read (*socket, [this_l = bootstrap.shared (), socket, channel, request] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
-			//std::cerr << "stream end\n";
+			std::cerr << "stream end\n";
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->sockets.push_back (std::make_pair (socket, channel));
 			this_l->condition.notify_all ();
 			return;
 		}
-		//std::cerr << "block: " << block->hash ().to_string () << std::endl;
+		std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
 		this_l->node->block_processor.add (block);
 		this_l->consumer.read_block (socket, channel, request);
 		++this_l->blocks;
