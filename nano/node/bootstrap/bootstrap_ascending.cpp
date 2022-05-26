@@ -143,6 +143,7 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		auto socket = std::make_shared<nano::client_socket> (*node);
 		auto channel = std::make_shared<nano::transport::channel_tcp> (*node, socket);
+		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
 		socket->async_connect (endpoint,
 		[endpoint, request = std::make_shared<request> (shared (), socket, channel)] (boost::system::error_code const & ec) {
 			if (ec)
