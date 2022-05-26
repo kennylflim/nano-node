@@ -25,13 +25,13 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 	//std::cerr << boost::str (boost::format ("Request completed\n"));
 }
 
-void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag, socket_channel ctx)
+void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start)
 {
 	//std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
 	nano::bulk_pull message{ node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
-	message.start = random_account ();
+	message.start = start;
 	message.end = 0;
 	message.count = cutoff;
 	//std::cerr << boost::str (boost::format ("Request sent: %1%\n") % message.start.to_string ());
@@ -59,7 +59,7 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag
 	});
 }
 
-nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_account ()
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_ledger_account ()
 {
 	nano::account search;
 	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
@@ -89,6 +89,35 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_account ()
 	{
 		return existing_account->second.head;
 	}
+}
+
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::hint_account ()
+{
+	nano::hash_or_account result{ 0 };
+	std::lock_guard<nano::mutex> lock{ mutex };
+	if (!hints.empty ())
+	{
+		auto iter = hints.begin ();
+		result = *iter;
+		hints.erase (iter);
+	}
+	return result;
+}
+
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::pick_account ()
+{
+	auto result = hint_account ();
+	if (!result.is_zero ())
+	{
+		++picked_hint;
+	}
+	else
+	{
+		result = random_ledger_account ();
+		++picked_ledger_random;
+	}
+	
+	return result;
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
@@ -131,12 +160,13 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		return;
 	}
 	auto tag = std::make_shared<async_tag> (shared ());
+	auto start = pick_account ();
 	std::unique_lock<nano::mutex> lock{ mutex };
 	if (!sockets.empty ())
 	{
 		auto socket = sockets.front ();
 		sockets.pop_front ();
-		send (tag, socket);
+		send (tag, socket, start);
 		return;
 	}
 	lock.unlock ();
@@ -147,14 +177,14 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		auto channel = std::make_shared<nano::transport::channel_tcp> (*node, socket);
 		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
 		socket->async_connect (endpoint,
-		[this_l = shared (), endpoint, tag, ctx = std::make_pair (socket, channel)] (boost::system::error_code const & ec) {
+		[this_l = shared (), endpoint, tag, ctx = std::make_pair (socket, channel), start] (boost::system::error_code const & ec) {
 			if (ec)
 			{
 				std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
 				return;
 			}
 			std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
-			this_l->send (tag, ctx);
+			this_l->send (tag, ctx, start);
 		});
 	}
 	else
@@ -175,11 +205,31 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			return;
 		}
 		auto account = this_l->node->ledger.account (tx, block.hash ());
+		std::lock_guard<nano::mutex> lock{ this_l->mutex };
+		this_l->hints.insert (account);
+		if (block.sideband ().details.is_send)
+		{
+			auto recipient = block.link ();
+			if (recipient.is_zero ())
+			{
+				recipient = block.source ();
+			}
+			if (!recipient.is_zero ())
+			{
+				this_l->hints.insert (recipient);
+			}
+		}
 	});
 	//for (auto i = 0; !stopped && i < 5'000; ++i)
+	int counter = 0;
 	while (!stopped)
 	{
 		request_one ();
+		if ((++counter % 10'000) == 0)
+		{
+			std::cerr << boost::str (boost::format ("hints: %1% random: %2%\n") % picked_hint.load () % picked_ledger_random.load ());
+			picked_hint = picked_ledger_random = 0;
+		}
 	}
 	
 	std::cerr << "!! stopping" << std::endl;
