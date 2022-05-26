@@ -14,7 +14,7 @@ nano::bootstrap::bootstrap_ascending::async_tag::async_tag (std::shared_ptr<nano
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	++bootstrap->requests;
 	bootstrap->condition.notify_all ();
-	std::cerr << boost::str (boost::format ("Request started\n"));
+	//std::cerr << boost::str (boost::format ("Request started\n"));
 }
 
 nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
@@ -22,10 +22,10 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	--bootstrap->requests;
 	bootstrap->condition.notify_all ();
-	std::cerr << boost::str (boost::format ("Request completed\n"));
+	//std::cerr << boost::str (boost::format ("Request completed\n"));
 }
 
-void nano::bootstrap::bootstrap_ascending::send (socket_channel ctx)
+void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag, socket_channel ctx)
 {
 	//std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
 	nano::bulk_pull message{ node->network_params.network };
@@ -34,26 +34,28 @@ void nano::bootstrap::bootstrap_ascending::send (socket_channel ctx)
 	message.start = random_account ();
 	message.end = 0;
 	message.count = cutoff;
-	std::cerr << boost::str (boost::format ("Request sent: %1%\n") % message.start.to_string ());
+	//std::cerr << boost::str (boost::format ("Request sent: %1%\n") % message.start.to_string ());
 	auto channel = ctx.second;
-	channel->send (message, [this_l = shared (), ctx = ctx] (boost::system::error_code const & ec, std::size_t size) {
-		this_l->read_block (ctx);
+	channel->send (message, [this_l = shared (), tag, ctx] (boost::system::error_code const & ec, std::size_t size) {
+		this_l->read_block (tag, ctx);
 	});
 }
 
-void nano::bootstrap::bootstrap_ascending::read_block (socket_channel ctx)
+void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag> tag, socket_channel ctx)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
 	auto socket = ctx.first;
-	deserializer->read (*socket, [this_l = shared (), ctx] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+	deserializer->read (*socket, [this_l = shared (), tag, ctx] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
-			std::cerr << "stream end\n";
+			//std::cerr << "stream end\n";
+			std::lock_guard<nano::mutex> lock{ this_l->mutex };
+			this_l->sockets.push_back (ctx);
 			return;
 		}
-		std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
+		//std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
 		this_l->node->block_processor.add (block);
-		this_l->read_block (ctx);
+		this_l->read_block (tag, ctx);
 	});
 }
 
@@ -128,16 +130,16 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		return;
 	}
-	/*std::unique_lock<nano::mutex> lock{ mutex };
-	std::shared_ptr<nano::socket> socket;
-	std::shared_ptr<nano::transport::channel> channel;
+	auto tag = std::make_shared<async_tag> (shared ());
+	std::unique_lock<nano::mutex> lock{ mutex };
 	if (!sockets.empty ())
 	{
-		auto &[socket, channel] = sockets.front ();
+		auto socket = sockets.front ();
 		sockets.pop_front ();
-		auto request = std::make_shared<bootstrap_ascending::request> (shared (), socket, channel);
-		request->send ();
-	}*/
+		send (tag, socket);
+		return;
+	}
+	lock.unlock ();
 	auto endpoint = node->network.bootstrap_peer (true);
 	if (endpoint != nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
 	{
@@ -145,14 +147,14 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		auto channel = std::make_shared<nano::transport::channel_tcp> (*node, socket);
 		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
 		socket->async_connect (endpoint,
-		[this_l = shared (), endpoint, ctx = std::make_pair (socket, channel)] (boost::system::error_code const & ec) {
+		[this_l = shared (), endpoint, tag, ctx = std::make_pair (socket, channel)] (boost::system::error_code const & ec) {
 			if (ec)
 			{
 				std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
 				return;
 			}
 			std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
-			this_l->send (ctx);
+			this_l->send (tag, ctx);
 		});
 	}
 	else
@@ -174,7 +176,8 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		}
 		auto account = this_l->node->ledger.account (tx, block.hash ());
 	});
-	for (auto i = 0; !stopped && i < 10'000; ++i)
+	//for (auto i = 0; !stopped && i < 5'000; ++i)
+	while (!stopped)
 	{
 		request_one ();
 	}

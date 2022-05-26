@@ -50,8 +50,8 @@ private:
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
 	void request_one ();
-	void send (socket_channel ctx);
-	void read_block (socket_channel ctx);
+	void send (std::shared_ptr<async_tag> tag, socket_channel ctx);
+	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
 	nano::hash_or_account random_account ();
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
