@@ -34,7 +34,7 @@ void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag,
 	message.start = start;
 	message.end = 0;
 	message.count = cutoff;
-	//std::cerr << boost::str (boost::format ("Request sent: %1%\n") % message.start.to_string ());
+	std::cerr << boost::str (boost::format ("Request sent for: %1% to: %2%\n") % message.start.to_string () % ctx.first->remote_endpoint ());
 	auto channel = ctx.second;
 	channel->send (message, [this_l = shared (), tag, ctx] (boost::system::error_code const & ec, std::size_t size) {
 		this_l->read_block (tag, ctx);
@@ -48,21 +48,19 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag
 	deserializer->read (*socket, [this_l = shared (), tag, ctx] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
-			//std::cerr << "stream end\n";
+			std::cerr << "stream end\n";
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->sockets.push_back (ctx);
 			return;
 		}
-		//std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
+		std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
 		this_l->node->block_processor.add (block);
 		this_l->read_block (tag, ctx);
 	});
 }
 
-nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_ledger_account ()
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::account const & search)
 {
-	nano::account search;
-	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
 	auto tx = node->store.tx_begin_read ();
 	auto existing_account = node->store.account.begin (tx, search);
 	if (existing_account == node->store.account.end ())
@@ -70,24 +68,56 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_ledger_accoun
 		existing_account = node->store.account.begin (tx);
 		debug_assert (existing_account != node->store.account.end ());
 	}
+	nano::account_info info;
 	auto account = existing_account->first;
+	auto error = node->store.account.get (tx, account, info);
+	debug_assert (!error);
+	auto result = info.head;
+	std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_string ());
+	return result;
+}
+
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_pending_entry (nano::account const & search)
+{
+	auto tx = node->store.tx_begin_read ();
 	auto existing_pending = node->store.pending.begin (tx, nano::pending_key{ search, 0 });
-	if (existing_pending != node->store.pending.end () && existing_pending->first.key () < account)
+	nano::hash_or_account result;
+	if (existing_pending != node->store.pending.end ())
 	{
-		account = existing_pending->first.key ();
+		auto account = existing_pending->first.key ();
 		nano::account_info info;
 		if (!node->store.account.get (tx, account, info))
 		{
-			return info.head;
+			result = info.head;
+			std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_string ());
 		}
 		else
 		{
-			return account;
+			result = account;
+			std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_account ());
 		}
 	}
 	else
 	{
-		return existing_account->second.head;
+		result = 0;
+	}
+}
+
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_ledger_account ()
+{
+	nano::account search;
+	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
+	std::cerr << boost::str (boost::format ("Search: %1% ") % search.to_string ());
+	auto rand = nano::random_pool::generate_byte ();
+	if (rand & 0x1)
+	{
+		std::cerr << boost::str (boost::format ("account "));
+		return random_account_entry (search);
+	}
+	else
+	{
+		std::cerr << boost::str (boost::format ("pending "));
+		return random_pending_entry (search);
 	}
 }
 
@@ -98,8 +128,13 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::hint_account ()
 	if (!hints.empty ())
 	{
 		auto iter = hints.begin ();
-		result = *iter;
+		auto account = *iter;
 		hints.erase (iter);
+		nano::account_info info;
+		if (!node->store.account.get (node->store.tx_begin_read (), account, info))
+		{
+			result = info.head;
+		}
 	}
 	return result;
 }
@@ -116,7 +151,6 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::pick_account ()
 		result = random_ledger_account ();
 		++picked_ledger_random;
 	}
-	
 	return result;
 }
 
@@ -161,6 +195,10 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	}
 	auto tag = std::make_shared<async_tag> (shared ());
 	auto start = pick_account ();
+	if (start.is_zero ())
+	{
+		return;
+	}
 	std::unique_lock<nano::mutex> lock{ mutex };
 	if (!sockets.empty ())
 	{
@@ -204,21 +242,21 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			return;
 		}
-		auto account = this_l->node->ledger.account (tx, block.hash ());
+		/*auto account = this_l->node->ledger.account (tx, block.hash ());
 		std::lock_guard<nano::mutex> lock{ this_l->mutex };
 		this_l->hints.insert (account);
 		if (block.sideband ().details.is_send)
 		{
-			auto recipient = block.link ();
+			auto recipient = block.link ().as_account ();
 			if (recipient.is_zero ())
 			{
-				recipient = block.source ();
+				recipient = block.destination ();
 			}
 			if (!recipient.is_zero ())
 			{
 				this_l->hints.insert (recipient);
 			}
-		}
+		}*/
 	});
 	//for (auto i = 0; !stopped && i < 5'000; ++i)
 	int counter = 0;

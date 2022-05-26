@@ -77,16 +77,19 @@ TEST (bootstrap_ascending, account_inductive)
 				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
 				 .work (*system.work.generate (send1->hash ()))
 				 .build_shared ();
+	std::cerr << "Genesis: " << nano::dev::genesis->hash ().to_string () << std::endl;
+	std::cerr << "Send1: " << send1->hash ().to_string () << std::endl;
+	std::cerr << "Send2: " << send2->hash ().to_string () << std::endl;
 	ASSERT_EQ (nano::process_result::progress, node0.process (*send1).code);
 	ASSERT_EQ (nano::process_result::progress, node0.process (*send2).code);
 	auto & node1 = *system.add_node (flags);
-	ASSERT_TIMELY (5s, node1.block (send2->hash ()) != nullptr);
+	ASSERT_TIMELY (50s, node1.block (send2->hash ()) != nullptr);
 }
 
 /**
  * Tests that bootstrap_ascending will return multiple new blocks in-order
  */
-TEST (bootstrap_ascending, DISABLED_trace_base)
+TEST (bootstrap_ascending, trace_base)
 {
 	nano::node_flags flags;
 	flags.disable_legacy_bootstrap = true;
@@ -112,6 +115,7 @@ TEST (bootstrap_ascending, DISABLED_trace_base)
 				 .sign (key.prv, key.pub)
 				 .work (*system.work.generate (key.pub))
 				 .build_shared ();
+	std::cerr << "Genesis key: " << nano::dev::genesis_key.pub.to_account () << std::endl;
 	std::cerr << "Key: " << key.pub.to_account () << std::endl;
 	std::cerr << "Genesis: " << nano::dev::genesis->hash ().to_string () << std::endl;
 	std::cerr << "send1: " << send1->hash ().to_string () << std::endl;
