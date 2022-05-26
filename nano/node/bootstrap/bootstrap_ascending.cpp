@@ -21,6 +21,11 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 {
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	--bootstrap->requests;
+	++bootstrap->requests_total;
+	if (blocks > 0)
+	{
+		++bootstrap->requests_non_empty;
+	}
 	bootstrap->condition.notify_all ();
 	//std::cerr << boost::str (boost::format ("Request completed\n"));
 }
@@ -34,7 +39,7 @@ void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag,
 	message.start = start;
 	message.end = 0;
 	message.count = cutoff;
-	std::cerr << boost::str (boost::format ("Request sent for: %1% to: %2%\n") % message.start.to_string () % ctx.first->remote_endpoint ());
+	//std::cerr << boost::str (boost::format ("Request sent for: %1% to: %2%\n") % message.start.to_string () % ctx.first->remote_endpoint ());
 	auto channel = ctx.second;
 	channel->send (message, [this_l = shared (), tag, ctx] (boost::system::error_code const & ec, std::size_t size) {
 		this_l->read_block (tag, ctx);
@@ -48,14 +53,15 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag
 	deserializer->read (*socket, [this_l = shared (), tag, ctx] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
-			std::cerr << "stream end\n";
+			//std::cerr << "stream end\n";
 			std::lock_guard<nano::mutex> lock{ this_l->mutex };
 			this_l->sockets.push_back (ctx);
 			return;
 		}
-		std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
+		//std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
 		this_l->node->block_processor.add (block);
 		this_l->read_block (tag, ctx);
+		++tag->blocks;
 	});
 }
 
@@ -73,7 +79,7 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_account_entry
 	auto error = node->store.account.get (tx, account, info);
 	debug_assert (!error);
 	auto result = info.head;
-	std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_string ());
+	//std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_string ());
 	return result;
 }
 
@@ -89,12 +95,12 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_pending_entry
 		if (!node->store.account.get (tx, account, info))
 		{
 			result = info.head;
-			std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_string ());
+			//std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_string ());
 		}
 		else
 		{
 			result = account;
-			std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_account ());
+			//std::cerr << boost::str (boost::format ("Found: %1%\n") % result.to_account ());
 		}
 	}
 	else
@@ -108,16 +114,16 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_ledger_accoun
 {
 	nano::account search;
 	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
-	std::cerr << boost::str (boost::format ("Search: %1% ") % search.to_string ());
+	//std::cerr << boost::str (boost::format ("Search: %1% ") % search.to_string ());
 	auto rand = nano::random_pool::generate_byte ();
 	if (rand & 0x1)
 	{
-		std::cerr << boost::str (boost::format ("account "));
+		//std::cerr << boost::str (boost::format ("account "));
 		return random_account_entry (search);
 	}
 	else
 	{
-		std::cerr << boost::str (boost::format ("pending "));
+		//std::cerr << boost::str (boost::format ("pending "));
 		return random_pending_entry (search);
 	}
 }
@@ -266,8 +272,9 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		request_one ();
 		if ((++counter % 10'000) == 0)
 		{
-			std::cerr << boost::str (boost::format ("hints: %1% random: %2%\n") % picked_hint.load () % picked_ledger_random.load ());
-			picked_hint = picked_ledger_random = 0;
+			double success_rate = static_cast<double> (requests_non_empty.load ()) / requests_total.load ();
+			std::cerr << boost::str (boost::format ("hints: %1% random: %2% Success rate: %3%\n") % picked_hint.load () % picked_ledger_random.load () % success_rate);
+			picked_hint = picked_ledger_random = requests_non_empty = requests_total = 0;
 		}
 	}
 	

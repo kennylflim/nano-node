@@ -19,6 +19,8 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 	public:
 		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap);
 		~async_tag ();
+
+		std::atomic<int> blocks{ 0 };
 	private:
 		std::shared_ptr<bootstrap_ascending> bootstrap;
 	};
@@ -61,6 +63,8 @@ private:
 	std::deque<socket_channel> sockets;
 	std::atomic<int> picked_hint{ 0 };
 	std::atomic<int> picked_ledger_random{ 0 };
+	std::atomic<int> requests_total{ 0 };
+	std::atomic<int> requests_non_empty{ 0 };
 	static constexpr int requests_max = 1;
 	static size_t constexpr cutoff = 1;
 	std::atomic<int> requests{ 0 };
