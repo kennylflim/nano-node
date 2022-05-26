@@ -132,11 +132,11 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::hint_account ()
 {
 	nano::hash_or_account result{ 0 };
 	std::lock_guard<nano::mutex> lock{ mutex };
-	if (!hints.empty ())
+	if (!trace_set.empty ())
 	{
-		auto iter = hints.begin ();
+		auto iter = trace_set.begin ();
 		auto account = *iter;
-		hints.erase (iter);
+		trace_set.erase (iter);
 		nano::account_info info;
 		if (!node->store.account.get (node->store.tx_begin_read (), account, info))
 		{
@@ -249,9 +249,9 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			return;
 		}
-		/*auto account = this_l->node->ledger.account (tx, block.hash ());
+		auto account = this_l->node->ledger.account (tx, block.hash ());
 		std::lock_guard<nano::mutex> lock{ this_l->mutex };
-		this_l->hints.insert (account);
+		this_l->trace_set.insert (account);
 		if (block.sideband ().details.is_send)
 		{
 			auto recipient = block.link ().as_account ();
@@ -261,9 +261,9 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			}
 			if (!recipient.is_zero ())
 			{
-				this_l->hints.insert (recipient);
+				this_l->trace_set.insert (recipient);
 			}
-		}*/
+		}
 	});
 	//for (auto i = 0; !stopped && i < 5'000; ++i)
 	int counter = 0;

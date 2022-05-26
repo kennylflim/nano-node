@@ -59,7 +59,7 @@ private:
 	nano::hash_or_account random_ledger_account ();
 	nano::hash_or_account hint_account ();
 	nano::hash_or_account pick_account ();
-	std::unordered_set<nano::account> hints;
+	std::unordered_set<nano::account> trace_set;
 	std::deque<socket_channel> sockets;
 	std::atomic<int> picked_hint{ 0 };
 	std::atomic<int> picked_ledger_random{ 0 };
