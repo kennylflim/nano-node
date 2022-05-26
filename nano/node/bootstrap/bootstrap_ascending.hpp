@@ -14,19 +14,15 @@ namespace bootstrap
 {
 class bootstrap_ascending : public nano::bootstrap_attempt
 {
-	class request : public std::enable_shared_from_this<request>
+	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
 	public:
-		request (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap, std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel);
-		~request ();
-		void send ();
+		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap);
+		~async_tag ();
 	private:
-		void read_block ();
-		nano::hash_or_account random_account ();
 		std::shared_ptr<bootstrap_ascending> bootstrap;
-		std::shared_ptr<nano::socket> socket;
-		std::shared_ptr<nano::transport::channel> channel;
 	};
+	using socket_channel = std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>;
 public:
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
 	
@@ -54,7 +50,10 @@ private:
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
 	void request_one ();
-	std::deque<std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>> sockets;
+	void send (socket_channel ctx);
+	void read_block (socket_channel ctx);
+	nano::hash_or_account random_account ();
+	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr cutoff = 1;
 	std::atomic<int> requests{ 0 };

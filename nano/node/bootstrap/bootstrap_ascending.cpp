@@ -8,10 +8,8 @@
 
 using namespace std::chrono_literals;
 
-nano::bootstrap::bootstrap_ascending::request::request (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap, std::shared_ptr<nano::socket> socket, std::shared_ptr<nano::transport::channel> channel) :
-	bootstrap{ bootstrap },
-	socket{ socket },
-	channel{ channel }
+nano::bootstrap::bootstrap_ascending::async_tag::async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap) :
+	bootstrap{ bootstrap }
 {
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	++bootstrap->requests;
@@ -19,7 +17,7 @@ nano::bootstrap::bootstrap_ascending::request::request (std::shared_ptr<nano::bo
 	std::cerr << boost::str (boost::format ("Request started\n"));
 }
 
-nano::bootstrap::bootstrap_ascending::request::~request ()
+nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 {
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	--bootstrap->requests;
@@ -27,54 +25,56 @@ nano::bootstrap::bootstrap_ascending::request::~request ()
 	std::cerr << boost::str (boost::format ("Request completed\n"));
 }
 
-void nano::bootstrap::bootstrap_ascending::request::send ()
+void nano::bootstrap::bootstrap_ascending::send (socket_channel ctx)
 {
 	//std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
-	nano::bulk_pull message{ bootstrap->node->network_params.network };
+	nano::bulk_pull message{ node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
 	message.start = random_account ();
 	message.end = 0;
 	message.count = cutoff;
 	std::cerr << boost::str (boost::format ("Request sent: %1%\n") % message.start.to_string ());
-	channel->send (message, [this_l = shared_from_this ()] (boost::system::error_code const & ec, std::size_t size) {
-		this_l->read_block ();
+	auto channel = ctx.second;
+	channel->send (message, [this_l = shared (), ctx = ctx] (boost::system::error_code const & ec, std::size_t size) {
+		this_l->read_block (ctx);
 	});
 }
 
-void nano::bootstrap::bootstrap_ascending::request::read_block ()
+void nano::bootstrap::bootstrap_ascending::read_block (socket_channel ctx)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
-	deserializer->read (*socket, [this_l = shared_from_this ()] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+	auto socket = ctx.first;
+	deserializer->read (*socket, [this_l = shared (), ctx] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
 			std::cerr << "stream end\n";
 			return;
 		}
 		std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
-		this_l->bootstrap->node->block_processor.add (block);
-		this_l->read_block ();
+		this_l->node->block_processor.add (block);
+		this_l->read_block (ctx);
 	});
 }
 
-nano::hash_or_account nano::bootstrap::bootstrap_ascending::request::random_account ()
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_account ()
 {
 	nano::account search;
 	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
-	auto tx = bootstrap->node->store.tx_begin_read ();
-	auto existing_account = bootstrap->node->store.account.begin (tx, search);
-	if (existing_account == bootstrap->node->store.account.end ())
+	auto tx = node->store.tx_begin_read ();
+	auto existing_account = node->store.account.begin (tx, search);
+	if (existing_account == node->store.account.end ())
 	{
-		existing_account = bootstrap->node->store.account.begin (tx);
-		debug_assert (existing_account != bootstrap->node->store.account.end ());
+		existing_account = node->store.account.begin (tx);
+		debug_assert (existing_account != node->store.account.end ());
 	}
 	auto account = existing_account->first;
-	auto existing_pending = bootstrap->node->store.pending.begin (tx, nano::pending_key{ search, 0 });
-	if (existing_pending != bootstrap->node->store.pending.end () && existing_pending->first.key () < account)
+	auto existing_pending = node->store.pending.begin (tx, nano::pending_key{ search, 0 });
+	if (existing_pending != node->store.pending.end () && existing_pending->first.key () < account)
 	{
 		account = existing_pending->first.key ();
 		nano::account_info info;
-		if (!bootstrap->node->store.account.get (tx, account, info))
+		if (!node->store.account.get (tx, account, info))
 		{
 			return info.head;
 		}
@@ -145,14 +145,14 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		auto channel = std::make_shared<nano::transport::channel_tcp> (*node, socket);
 		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
 		socket->async_connect (endpoint,
-		[endpoint, request = std::make_shared<request> (shared (), socket, channel)] (boost::system::error_code const & ec) {
+		[this_l = shared (), endpoint, ctx = std::make_pair (socket, channel)] (boost::system::error_code const & ec) {
 			if (ec)
 			{
 				std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
 				return;
 			}
 			std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
-			request->send ();
+			this_l->send (ctx);
 		});
 	}
 	else
