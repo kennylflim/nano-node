@@ -101,6 +101,7 @@ nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_pending_entry
 	{
 		result = 0;
 	}
+	return result;
 }
 
 nano::hash_or_account nano::bootstrap::bootstrap_ascending::random_ledger_account ()
