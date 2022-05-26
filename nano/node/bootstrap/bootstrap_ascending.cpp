@@ -29,25 +29,14 @@ nano::bootstrap::bootstrap_ascending::request::~request ()
 
 void nano::bootstrap::bootstrap_ascending::request::send ()
 {
-	nano::account search;
-	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
-	nano::account_info info;
-	auto tx = bootstrap->node->store.tx_begin_read ();
-	auto existing = bootstrap->node->store.account.begin (tx, search);
-	if (existing == bootstrap->node->store.account.end ())
-	{
-		existing = bootstrap->node->store.account.begin (tx);
-		debug_assert (existing != bootstrap->node->store.account.end ());
-	}
-	auto account = existing->first;
 	//std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
 	nano::bulk_pull message{ bootstrap->node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
-	message.start = info.head;
+	message.start = random_account ();
 	message.end = 0;
 	message.count = cutoff;
-	std::cerr << boost::str (boost::format ("Request sent: %1%\n") % account.to_account ());
+	std::cerr << boost::str (boost::format ("Request sent: %1%\n") % message.start.to_string ());
 	channel->send (message, [this_l = shared_from_this ()] (boost::system::error_code const & ec, std::size_t size) {
 		this_l->read_block ();
 	});
@@ -66,6 +55,38 @@ void nano::bootstrap::bootstrap_ascending::request::read_block ()
 		this_l->bootstrap->node->block_processor.add (block);
 		this_l->read_block ();
 	});
+}
+
+nano::hash_or_account nano::bootstrap::bootstrap_ascending::request::random_account ()
+{
+	nano::account search;
+	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
+	auto tx = bootstrap->node->store.tx_begin_read ();
+	auto existing_account = bootstrap->node->store.account.begin (tx, search);
+	if (existing_account == bootstrap->node->store.account.end ())
+	{
+		existing_account = bootstrap->node->store.account.begin (tx);
+		debug_assert (existing_account != bootstrap->node->store.account.end ());
+	}
+	auto account = existing_account->first;
+	auto existing_pending = bootstrap->node->store.pending.begin (tx, nano::pending_key{ search, 0 });
+	if (existing_pending != bootstrap->node->store.pending.end () && existing_pending->first.key () < account)
+	{
+		account = existing_pending->first.key ();
+		nano::account_info info;
+		if (!bootstrap->node->store.account.get (tx, account, info))
+		{
+			return info.head;
+		}
+		else
+		{
+			return account;
+		}
+	}
+	else
+	{
+		return existing_account->second.head;
+	}
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()

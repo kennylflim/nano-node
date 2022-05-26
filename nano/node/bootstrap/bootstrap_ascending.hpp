@@ -22,6 +22,7 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 		void send ();
 	private:
 		void read_block ();
+		nano::hash_or_account random_account ();
 		std::shared_ptr<bootstrap_ascending> bootstrap;
 		std::shared_ptr<nano::socket> socket;
 		std::shared_ptr<nano::transport::channel> channel;
