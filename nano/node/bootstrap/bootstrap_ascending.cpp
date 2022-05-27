@@ -118,7 +118,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		}
 	}
 	std::lock_guard<nano::mutex> lock{ mutex };
-	return *std::min_element (accounts.begin (), accounts.end (), [this] (nano::account const & lhs, nano::account const & rhs) { return choke[lhs] < choke[rhs]; });
+	return *std::min_element (accounts.begin (), accounts.end (), [this] (nano::account const & lhs, nano::account const & rhs) { return backoff[lhs] < backoff[rhs]; });
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
@@ -166,7 +166,7 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		return;
 	}
-	++choke [*account];
+	++backoff [*account];
 	nano::account_info info;
 	nano::hash_or_account start = *account;
 	if (!node->store.account.get (node->store.tx_begin_read (), *account, info))
@@ -222,13 +222,13 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::progress:
 			{
 				auto account = this_l->node->ledger.account (tx, block.hash ());
-				this_l->choke [account] >>= 1;
+				this_l->backoff [account] >>= 1;
 				break;
 			}
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				this_l->choke [account] <<= 1;
+				this_l->backoff [account] <<= 1;
 				break;
 			}
 			default:

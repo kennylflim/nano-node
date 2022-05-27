@@ -58,7 +58,7 @@ private:
 	std::optional<nano::account> random_pending_entry (nano::account const & search);
 	std::optional<nano::account> random_ledger_account ();
 	std::optional<nano::account> pick_account ();
-	std::unordered_map<nano::account, uint32_t> choke;
+	std::unordered_map<nano::account, uint32_t> backoff;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 64;
