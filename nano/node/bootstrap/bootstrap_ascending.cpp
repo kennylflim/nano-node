@@ -117,6 +117,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 			accounts.insert (*account);
 		}
 	}
+	std::lock_guard<nano::mutex> lock{ mutex };
 	return *std::min_element (accounts.begin (), accounts.end (), [this] (nano::account const & lhs, nano::account const & rhs) { return choke[lhs] < choke[rhs]; });
 }
 
