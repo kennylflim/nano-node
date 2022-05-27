@@ -253,10 +253,18 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		this_l->trace_set.insert (account);
 		if (block.sideband ().details.is_send)
 		{
-			auto recipient = block.link ().as_account ();
-			if (recipient.is_zero ())
+			nano::account recipient{ 0 };
+			switch (block.type ())
 			{
-				recipient = block.destination ();
+				case nano::block_type::send:
+					recipient = block.destination ();
+					break;
+				case nano::block_type::state:
+					recipient = block.link ().as_account ();
+					break;
+				default:
+					debug_assert (false);
+					break;
 			}
 			if (!recipient.is_zero ())
 			{
