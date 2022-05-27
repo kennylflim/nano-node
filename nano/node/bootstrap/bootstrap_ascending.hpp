@@ -54,6 +54,7 @@ private:
 	void request_one ();
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
+	void dump_backoff_hist ();
 	nano::account random_account_entry (nano::account const & search);
 	std::optional<nano::account> random_pending_entry (nano::account const & search);
 	std::optional<nano::account> random_ledger_account ();

@@ -59,6 +59,31 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag
 	});
 }
 
+void nano::bootstrap::bootstrap_ascending::dump_backoff_hist ()
+{
+	std::vector<size_t> weight_counts;
+	std::lock_guard<nano::mutex> lock{ mutex };
+	for (auto &[account, count]: backoff)
+	{
+		auto log = std::log2 (std::max<decltype(count)> (count, 1));
+		//std::cerr << "log: " << log << ' ';
+		auto index = static_cast<size_t> (log);
+		if (weight_counts.size () <= index)
+		{
+			weight_counts.resize (index + 1);
+		}
+		++weight_counts[index];
+	}
+	std::string output;
+	output += "Backoff hist (" + std::to_string (backoff.size ()) + "): ";
+	for (size_t i = 0, n = weight_counts.size (); i < n; ++i)
+	{
+		output += std::to_string (weight_counts[i]) + ' ';
+	}
+	output += '\n';
+	std::cerr << output;
+}
+
 nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::account const & search)
 {
 	auto tx = node->store.tx_begin_read ();
@@ -166,7 +191,17 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		return;
 	}
-	++backoff [*account];
+	
+	auto existing = backoff [*account];
+	auto updated = existing + 1;
+	if (updated < existing)
+	{
+		updated = std::numeric_limits<decltype(updated)>::max ();
+	}
+	backoff[*account] = updated;
+	
+	//++backoff [*account];
+	
 	nano::account_info info;
 	nano::hash_or_account start = *account;
 	if (!node->store.account.get (node->store.tx_begin_read (), *account, info))
@@ -228,7 +263,17 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				this_l->backoff [account] <<= 1;
+				
+				auto existing = this_l->backoff [account];
+				auto updated = existing << 1;
+				if (updated < existing)
+				{
+					updated = std::numeric_limits<decltype(updated)>::max ();
+				}
+				this_l->backoff [account] = updated;
+				
+				//this_l->backoff [account] <<= 1;
+				
 				break;
 			}
 			default:
@@ -244,6 +289,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			node->block_processor.flush ();
 			node->block_processor.dump_result_hist ();
+			dump_backoff_hist ();
 		}
 	}
 	
