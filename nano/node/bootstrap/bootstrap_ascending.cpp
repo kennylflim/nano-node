@@ -109,24 +109,20 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
-	auto account1 = random_ledger_account ();
-	auto account2 = random_ledger_account ();
-	if (!account1)
+	std::unordered_set<nano::account> accounts;
+	while (accounts.size () < request_message_count)
 	{
-		return account2;
+		auto account = random_ledger_account ();
+		if (account)
+		{
+			if (accounts.count (*account) > 0)
+			{
+				break;
+			}
+			accounts.insert (*account);
+		}
 	}
-	if (!account2)
-	{
-		return account1;
-	}
-	if (choke[*account1] < choke[*account2])
-	{
-		return account1;
-	}
-	else
-	{
-		return account2;
-	}
+	return *std::min_element (accounts.begin (), accounts.end (), [this] (nano::account const & lhs, nano::account const & rhs) { return choke[lhs] < choke[rhs]; });
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
