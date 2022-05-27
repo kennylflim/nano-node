@@ -209,34 +209,29 @@ static int pass_number = 0;
 void nano::bootstrap::bootstrap_ascending::run ()
 {
 	std::cerr << "!! Starting with:" << std::to_string (pass_number++) << "\n";
-	node->block_processor.inserted.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::block const & block) {
+	node->block_processor.processed.add ([this_w = std::weak_ptr<nano::bootstrap::bootstrap_ascending>{ shared () }] (nano::transaction const & tx, nano::process_return const & result, nano::block const & block) {
 		auto this_l = this_w.lock ();
 		if (this_l == nullptr)
 		{
 			return;
 		}
-		auto account = this_l->node->ledger.account (tx, block.hash ());
 		std::lock_guard<nano::mutex> lock{ this_l->mutex };
-		this_l->choke [account] >>= 1;
-		if (block.sideband ().details.is_send)
+		switch (result.code)
 		{
-			nano::account recipient{ 0 };
-			switch (block.type ())
+			case nano::process_result::progress:
 			{
-				case nano::block_type::send:
-					recipient = block.destination ();
-					break;
-				case nano::block_type::state:
-					recipient = block.link ().as_account ();
-					break;
-				default:
-					debug_assert (false);
-					break;
+				auto account = this_l->node->ledger.account (tx, block.hash ());
+				this_l->choke [account] >>= 1;
+				break;
 			}
-			if (!recipient.is_zero ())
+			case nano::process_result::gap_source:
 			{
-				this_l->choke [recipient] >>= 1;
+				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
+				this_l->choke [account] <<= 1;
+				break;
 			}
+			default:
+				break;
 		}
 	});
 	//for (auto i = 0; !stopped && i < 5'000; ++i)
