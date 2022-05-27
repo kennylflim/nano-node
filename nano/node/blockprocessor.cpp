@@ -342,6 +342,27 @@ void nano::block_processor::process_live (nano::transaction const & transaction_
 	}
 }
 
+void nano::block_processor::dump_result_hist ()
+{
+	std::lock_guard<nano::mutex> lock{ mutex };
+	std::string result;
+	result += "Process result hist: ";
+	for (auto i = 0; i <= static_cast<int> (nano::process_result::insufficient_work); ++i)
+	{
+		auto count = result_hist[static_cast<nano::process_result> (i)];
+		if (count > 0)
+		{
+			result += std::to_string (i);
+			result += ' ';
+			result += std::to_string (count);
+			result += ' ';
+		}
+	}
+	result += '\n';
+	std::cerr << result;
+	result_hist.clear ();
+}
+
 nano::process_return nano::block_processor::process_one (nano::write_transaction const & transaction_a, block_post_events & events_a, nano::unchecked_info info_a, bool const forced_a, nano::block_origin const origin_a)
 {
 	nano::process_return result;
@@ -349,6 +370,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 	auto hash (block->hash ());
 	result = node.ledger.process (transaction_a, *block, info_a.verified);
 	//std::cerr << "inserting block: " << hash.to_string () << " " << static_cast<int> (result.code) << " on: " << node.network.endpoint () << std::endl;
+	++result_hist[result.code];
 	switch (result.code)
 	{
 		case nano::process_result::progress:

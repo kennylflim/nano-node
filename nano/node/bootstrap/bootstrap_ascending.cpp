@@ -275,6 +275,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			double success_rate = static_cast<double> (requests_non_empty.load ()) / requests_total.load ();
 			std::cerr << boost::str (boost::format ("hints: %1% random: %2% Success rate: %3%\n") % picked_hint.load () % picked_ledger_random.load () % success_rate);
 			picked_hint = picked_ledger_random = requests_non_empty = requests_total = 0;
+			node->block_processor.dump_result_hist ();
 		}
 	}
 	
