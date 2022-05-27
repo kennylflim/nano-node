@@ -57,9 +57,8 @@ private:
 	nano::account random_account_entry (nano::account const & search);
 	std::optional<nano::account> random_pending_entry (nano::account const & search);
 	std::optional<nano::account> random_ledger_account ();
-	std::optional<nano::account> hint_account ();
 	std::optional<nano::account> pick_account ();
-	std::unordered_set<nano::account> trace_set;
+	std::unordered_map<nano::account, uint32_t> choke;
 	std::deque<socket_channel> sockets;
 	std::atomic<int> picked_hint{ 0 };
 	std::atomic<int> picked_ledger_random{ 0 };

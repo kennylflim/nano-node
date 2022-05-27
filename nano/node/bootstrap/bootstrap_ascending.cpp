@@ -107,32 +107,26 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 	}
 }
 
-std::optional<nano::account> nano::bootstrap::bootstrap_ascending::hint_account ()
-{
-	std::optional<nano::account> result;
-	std::lock_guard<nano::mutex> lock{ mutex };
-	if (!trace_set.empty ())
-	{
-		auto iter = trace_set.begin ();
-		result = *iter;
-		trace_set.erase (iter);
-	}
-	return result;
-}
-
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
-	auto result = hint_account ();
-	if (result)
+	auto account1 = random_ledger_account ();
+	auto account2 = random_ledger_account ();
+	if (!account1)
 	{
-		++picked_hint;
+		return account2;
+	}
+	if (!account2)
+	{
+		return account1;
+	}
+	if (choke[*account1] < choke[*account2])
+	{
+		return account1;
 	}
 	else
 	{
-		result = random_ledger_account ();
-		++picked_ledger_random;
+		return account2;
 	}
-	return result;
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
@@ -180,6 +174,7 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		return;
 	}
+	++choke [*account];
 	nano::account_info info;
 	nano::hash_or_account start = *account;
 	if (!node->store.account.get (node->store.tx_begin_read (), *account, info))
@@ -231,7 +226,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		}
 		auto account = this_l->node->ledger.account (tx, block.hash ());
 		std::lock_guard<nano::mutex> lock{ this_l->mutex };
-		this_l->trace_set.insert (account);
+		this_l->choke [account] >>= 1;
 		if (block.sideband ().details.is_send)
 		{
 			nano::account recipient{ 0 };
@@ -249,7 +244,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			}
 			if (!recipient.is_zero ())
 			{
-				this_l->trace_set.insert (recipient);
+				this_l->choke [recipient] >>= 1;
 			}
 		}
 	});
