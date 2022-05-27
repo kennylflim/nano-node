@@ -21,11 +21,6 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 {
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	--bootstrap->requests;
-	++bootstrap->requests_total;
-	if (blocks > 0)
-	{
-		++bootstrap->requests_non_empty;
-	}
 	bootstrap->condition.notify_all ();
 	//std::cerr << boost::str (boost::format ("Request completed\n"));
 }
@@ -252,9 +247,6 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		if ((++counter % 10'000) == 0)
 		{
 			node->block_processor.flush ();
-			double success_rate = static_cast<double> (requests_non_empty.load ()) / requests_total.load ();
-			std::cerr << boost::str (boost::format ("hints: %1% random: %2% Success rate: %3%\n") % picked_hint.load () % picked_ledger_random.load () % success_rate);
-			picked_hint = picked_ledger_random = requests_non_empty = requests_total = 0;
 			node->block_processor.dump_result_hist ();
 		}
 	}

@@ -60,10 +60,6 @@ private:
 	std::optional<nano::account> pick_account ();
 	std::unordered_map<nano::account, uint32_t> choke;
 	std::deque<socket_channel> sockets;
-	std::atomic<int> picked_hint{ 0 };
-	std::atomic<int> picked_ledger_random{ 0 };
-	std::atomic<int> requests_total{ 0 };
-	std::atomic<int> requests_non_empty{ 0 };
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 64;
 	std::atomic<int> requests{ 0 };
