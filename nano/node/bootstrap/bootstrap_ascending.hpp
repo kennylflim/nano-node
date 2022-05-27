@@ -54,11 +54,11 @@ private:
 	void request_one ();
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
-	nano::hash_or_account random_account_entry (nano::account const & search);
-	nano::hash_or_account random_pending_entry (nano::account const & search);
-	nano::hash_or_account random_ledger_account ();
-	nano::hash_or_account hint_account ();
-	nano::hash_or_account pick_account ();
+	nano::account random_account_entry (nano::account const & search);
+	std::optional<nano::account> random_pending_entry (nano::account const & search);
+	std::optional<nano::account> random_ledger_account ();
+	std::optional<nano::account> hint_account ();
+	std::optional<nano::account> pick_account ();
 	std::unordered_set<nano::account> trace_set;
 	std::deque<socket_channel> sockets;
 	std::atomic<int> picked_hint{ 0 };
