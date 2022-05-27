@@ -105,7 +105,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
 	std::unordered_set<nano::account> accounts;
-	while (accounts.size () < request_message_count)
+	while (accounts.size () < backoff_exclusion)
 	{
 		auto account = random_ledger_account ();
 		if (account)
