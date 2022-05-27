@@ -66,7 +66,7 @@ private:
 	std::atomic<int> requests_total{ 0 };
 	std::atomic<int> requests_non_empty{ 0 };
 	static constexpr int requests_max = 1;
-	static size_t constexpr cutoff = 1;
+	static size_t constexpr request_message_count = 64;
 	std::atomic<int> requests{ 0 };
 	/// Wait for there to be space for an additional request
 	bool wait_available_request ();

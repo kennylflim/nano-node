@@ -32,13 +32,12 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 
 void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start)
 {
-	//std::cerr << "requesting: " << account.to_account () << " at: " << start.to_string () <<  " from endpoint: " << socket->remote_endpoint() << std::endl;
 	nano::bulk_pull message{ node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
 	message.header.flag_set (nano::message_header::bulk_pull_count_present_flag);
 	message.start = start;
 	message.end = 0;
-	message.count = cutoff;
+	message.count = request_message_count;
 	//std::cerr << boost::str (boost::format ("Request sent for: %1% to: %2%\n") % message.start.to_string () % ctx.first->remote_endpoint ());
 	auto channel = ctx.second;
 	channel->send (message, [this_l = shared (), tag, ctx] (boost::system::error_code const & ec, std::size_t size) {
@@ -272,6 +271,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		request_one ();
 		if ((++counter % 10'000) == 0)
 		{
+			node->block_processor.flush ();
 			double success_rate = static_cast<double> (requests_non_empty.load ()) / requests_total.load ();
 			std::cerr << boost::str (boost::format ("hints: %1% random: %2% Success rate: %3%\n") % picked_hint.load () % picked_ledger_random.load () % success_rate);
 			picked_hint = picked_ledger_random = requests_non_empty = requests_total = 0;
