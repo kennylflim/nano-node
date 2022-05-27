@@ -129,6 +129,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
+	static_assert (backoff_exclusion > 0);
 	std::unordered_set<nano::account> accounts;
 	while (accounts.size () < backoff_exclusion)
 	{
@@ -159,25 +160,6 @@ nano::bootstrap::bootstrap_ascending::bootstrap_ascending (std::shared_ptr<nano:
 	std::cerr << '\0';
 }
 
-/*void nano::bootstrap::bootstrap_ascending::dump_miss_histogram ()
-{
-	std::vector<int> histogram;
-	std::lock_guard<nano::mutex> lock{ mutex };
-	for (auto const &[account, count]: misses)
-	{
-		if (count >= histogram.size ())
-		{
-			histogram.resize (count + 1);
-		}
-		++histogram[count];
-	}
-	for (auto i: histogram)
-	{
-		std::cerr << std::to_string (i) << ' ';
-	}
-	std::cerr << std::endl;
-}*/
-
 void nano::bootstrap::bootstrap_ascending::request_one ()
 {
 	wait_available_request ();
@@ -191,7 +173,6 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		return;
 	}
-	
 	auto existing = backoff [*account];
 	auto updated = existing + 1;
 	if (updated < existing)
@@ -199,9 +180,6 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		updated = std::numeric_limits<decltype(updated)>::max ();
 	}
 	backoff[*account] = updated;
-	
-	//++backoff [*account];
-	
 	nano::account_info info;
 	nano::hash_or_account start = *account;
 	if (!node->store.account.get (node->store.tx_begin_read (), *account, info))
@@ -257,13 +235,12 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::progress:
 			{
 				auto account = this_l->node->ledger.account (tx, block.hash ());
-				this_l->backoff [account] >>= 1;
+				this_l->backoff [account] = 0;
 				break;
 			}
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				
 				auto existing = this_l->backoff [account];
 				auto updated = existing << 1;
 				if (updated < existing)
@@ -271,9 +248,6 @@ void nano::bootstrap::bootstrap_ascending::run ()
 					updated = std::numeric_limits<decltype(updated)>::max ();
 				}
 				this_l->backoff [account] = updated;
-				
-				//this_l->backoff [account] <<= 1;
-				
 				break;
 			}
 			default:
