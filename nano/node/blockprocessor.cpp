@@ -359,6 +359,7 @@ void nano::block_processor::dump_result_hist ()
 		}
 	}
 	result += '\n';
+	result += boost::str (boost::format ("total: %1%\ngap_source: %2% gap source rate: %3%\ngap_previous: %4% gap previous rate: %5%\n") % processed_count % gap_source_count % (static_cast<double> (gap_source_count) / processed_count) % gap_previous_count % (static_cast<double> (gap_previous_count) / processed_count));
 	std::cerr << result;
 	result_hist.clear ();
 }
@@ -371,6 +372,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 	result = node.ledger.process (transaction_a, *block, info_a.verified);
 	//std::cerr << "inserting block: " << hash.to_string () << " " << static_cast<int> (result.code) << " on: " << node.network.endpoint () << std::endl;
 	++result_hist[result.code];
+	++processed_count;
 	events_a.events.emplace_back ([this, result, block = info_a.block] (nano::transaction const & tx) {
 		processed.notify (tx, result, *block);
 	});
@@ -403,6 +405,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 		}
 		case nano::process_result::gap_previous:
 		{
+			++gap_previous_count;
 			if (node.config.logging.ledger_logging ())
 			{
 				node.logger.try_log (boost::str (boost::format ("Gap previous for: %1%") % hash.to_string ()));
@@ -415,6 +418,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 		}
 		case nano::process_result::gap_source:
 		{
+			++gap_source_count;
 			if (node.config.logging.ledger_logging ())
 			{
 				node.logger.try_log (boost::str (boost::format ("Gap source for: %1%") % hash.to_string ()));

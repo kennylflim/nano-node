@@ -21,6 +21,10 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 {
 	std::lock_guard<nano::mutex> lock{ bootstrap->mutex };
 	--bootstrap->requests;
+	if (blocks != 0)
+	{
+		++bootstrap->responses;
+	}
 	bootstrap->condition.notify_all ();
 	//std::cerr << boost::str (boost::format ("Request completed\n"));
 }
@@ -254,26 +258,24 @@ void nano::bootstrap::bootstrap_ascending::run ()
 				this_l->backoff [account] = 0;
 				this_l->source_blocked.erase (account);
 				auto forward = [&] () {
-					this_l->forwarding.insert (account);
 					if (this_l->node->ledger.is_send (tx, block))
 					{
 						switch (block.type ())
 						{
 							case nano::block_type::send:
-								account = block.destination ();
+								this_l->forwarding.insert (block.destination ());
 								break;
 							case nano::block_type::state:
-								account = block.link ().as_account ();
+								this_l->forwarding.insert (block.link ().as_account ());
 								break;
 							default:
 								debug_assert (false);
-								account = account; // Fail in a predictable way, insert the block's account again.
 								break;
 						}
-						this_l->forwarding.insert (account);
+						
 					}
 				};
-				//forward ();
+				forward ();
 				break;
 			}
 			case nano::process_result::gap_source:
@@ -291,13 +293,15 @@ void nano::bootstrap::bootstrap_ascending::run ()
 	while (!stopped)
 	{
 		request_one ();
-		if ((++counter % 10'000) == 0)
+		auto iterations = 10'000;
+		if ((++counter % iterations) == 0)
 		{
 			node->block_processor.flush ();
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
 			std::lock_guard<nano::mutex> lock{ mutex };
-			std::cerr << boost::str (boost::format ("Forwarding: %1% source blocked: %2%\n") % forwarding.size () % source_blocked.size ());
+			std::cerr << boost::str (boost::format ("Forwarding: %1% source blocked: %2% responses: %3% response rate %4%\n") % forwarding.size () % source_blocked.size () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
+			responses = 0;
 		}
 	}
 	
