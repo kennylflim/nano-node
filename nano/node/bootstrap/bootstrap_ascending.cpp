@@ -131,6 +131,15 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 {
 	static_assert (backoff_exclusion > 0);
 	std::unordered_set<nano::account> accounts;
+	{
+		std::lock_guard<nano::mutex> lock{ mutex };
+		if (!forwarding.empty ())
+		{
+			auto first = forwarding.begin ();;
+			accounts.insert (*first);
+			forwarding.erase (first);
+		}
+	}
 	while (accounts.size () < backoff_exclusion)
 	{
 		auto account = random_ledger_account ();
@@ -236,6 +245,24 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			{
 				auto account = this_l->node->ledger.account (tx, block.hash ());
 				this_l->backoff [account] = 0;
+				this_l->forwarding.insert (account);
+				if (this_l->node->ledger.is_send (tx, block))
+				{
+					switch (block.type ())
+					{
+						case nano::block_type::send:
+							account = block.destination ();
+							break;
+						case nano::block_type::state:
+							account = block.link ().as_account ();
+							break;
+						default:
+							debug_assert (false);
+							account = account; // Fail in a predictable way, insert the block's account again.
+							break;
+					}
+					this_l->forwarding.insert (account);
+				}
 				break;
 			}
 			case nano::process_result::gap_source:
@@ -264,6 +291,8 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			node->block_processor.flush ();
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
+			std::lock_guard<nano::mutex> lock{ mutex };
+			std::cerr << boost::str (boost::format ("Forwarding: %1%\n") % forwarding.size ());
 		}
 	}
 	
