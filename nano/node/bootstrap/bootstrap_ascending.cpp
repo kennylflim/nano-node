@@ -135,8 +135,12 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		std::lock_guard<nano::mutex> lock{ mutex };
 		if (!forwarding.empty ())
 		{
-			auto first = forwarding.begin ();;
-			accounts.insert (*first);
+			auto first = forwarding.begin ();
+			auto account = *first;
+			if (source_blocked.count (account) == 0)
+			{
+				accounts.insert (account);
+			}
 			forwarding.erase (first);
 		}
 	}
@@ -149,7 +153,10 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 			{
 				break;
 			}
-			accounts.insert (*account);
+			if (source_blocked.count (*account) == 0)
+			{
+				accounts.insert (*account);
+			}
 		}
 	}
 	std::lock_guard<nano::mutex> lock{ mutex };
@@ -245,36 +252,34 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			{
 				auto account = this_l->node->ledger.account (tx, block.hash ());
 				this_l->backoff [account] = 0;
-				this_l->forwarding.insert (account);
-				if (this_l->node->ledger.is_send (tx, block))
-				{
-					switch (block.type ())
-					{
-						case nano::block_type::send:
-							account = block.destination ();
-							break;
-						case nano::block_type::state:
-							account = block.link ().as_account ();
-							break;
-						default:
-							debug_assert (false);
-							account = account; // Fail in a predictable way, insert the block's account again.
-							break;
-					}
+				this_l->source_blocked.erase (account);
+				auto forward = [&] () {
 					this_l->forwarding.insert (account);
-				}
+					if (this_l->node->ledger.is_send (tx, block))
+					{
+						switch (block.type ())
+						{
+							case nano::block_type::send:
+								account = block.destination ();
+								break;
+							case nano::block_type::state:
+								account = block.link ().as_account ();
+								break;
+							default:
+								debug_assert (false);
+								account = account; // Fail in a predictable way, insert the block's account again.
+								break;
+						}
+						this_l->forwarding.insert (account);
+					}
+				};
+				//forward ();
 				break;
 			}
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				auto existing = this_l->backoff [account];
-				auto updated = existing << 1;
-				if (updated < existing)
-				{
-					updated = std::numeric_limits<decltype(updated)>::max ();
-				}
-				this_l->backoff [account] = updated;
+				//this_l->source_blocked.insert (account);
 				break;
 			}
 			default:
@@ -292,7 +297,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
 			std::lock_guard<nano::mutex> lock{ mutex };
-			std::cerr << boost::str (boost::format ("Forwarding: %1%\n") % forwarding.size ());
+			std::cerr << boost::str (boost::format ("Forwarding: %1% source blocked: %2%\n") % forwarding.size () % source_blocked.size ());
 		}
 	}
 	

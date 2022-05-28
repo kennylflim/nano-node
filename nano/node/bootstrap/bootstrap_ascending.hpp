@@ -60,11 +60,12 @@ private:
 	std::optional<nano::account> random_ledger_account ();
 	std::optional<nano::account> pick_account ();
 	std::unordered_set<nano::account> forwarding;
+	std::unordered_set<nano::account> source_blocked;
 	std::unordered_map<nano::account, uint32_t> backoff;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 1;
-	static size_t constexpr backoff_exclusion = 2;
+	static size_t constexpr backoff_exclusion = 1;
 	std::atomic<int> requests{ 0 };
 	/// Wait for there to be space for an additional request
 	bool wait_available_request ();
