@@ -134,22 +134,23 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
 	static_assert (backoff_exclusion > 0);
-	std::unordered_set<nano::account> accounts;
 	{
 		std::lock_guard<nano::mutex> lock{ mutex };
 		if (!forwarding.empty ())
 		{
 			auto first = forwarding.begin ();
 			auto account = *first;
+			forwarding.erase (first);
 			if (source_blocked.count (account) == 0)
 			{
-				accounts.insert (account);
+				return account;
 			}
-			forwarding.erase (first);
 		}
 	}
+	std::unordered_set<nano::account> accounts;
 	while (accounts.size () < backoff_exclusion)
 	{
+		++source_iterations;
 		auto account = random_ledger_account ();
 		if (account)
 		{
@@ -258,6 +259,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 				this_l->backoff [account] = 0;
 				this_l->source_blocked.erase (account);
 				auto forward = [&] () {
+					this_l->forwarding.insert (account);
 					if (this_l->node->ledger.is_send (tx, block))
 					{
 						switch (block.type ())
@@ -281,7 +283,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				//this_l->source_blocked.insert (account);
+				this_l->source_blocked.insert (account);
 				break;
 			}
 			default:
@@ -300,7 +302,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
 			std::lock_guard<nano::mutex> lock{ mutex };
-			std::cerr << boost::str (boost::format ("Forwarding: %1% source blocked: %2% responses: %3% response rate %4%\n") % forwarding.size () % source_blocked.size () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
+			std::cerr << boost::str (boost::format ("Forwarding: %1% source blocked: %2% source iterations: %3% responses: %4% response rate %5%\n") % forwarding.size () % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
 			responses = 0;
 		}
 	}

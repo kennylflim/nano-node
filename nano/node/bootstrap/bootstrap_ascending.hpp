@@ -64,11 +64,11 @@ private:
 	std::unordered_map<nano::account, uint32_t> backoff;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
-	static size_t constexpr request_message_count = 2;
-	static_assert(request_message_count >= 2, "request_message_count too small"); // Minimum message request count is 2 otherwise forwarding needs to forward own account
+	static size_t constexpr request_message_count = 1;
 	static size_t constexpr backoff_exclusion = 1;
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
+	std::atomic<int> source_iterations{ 0 };
 	/// Wait for there to be space for an additional request
 	bool wait_available_request ();
 };
