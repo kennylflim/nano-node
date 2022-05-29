@@ -311,7 +311,10 @@ void nano::bootstrap::bootstrap_ascending::run ()
 								this_l->forwarding.insert (block.destination ());
 								break;
 							case nano::block_type::state:
-								this_l->forwarding.insert (block.link ().as_account ());
+								if (forward_hint_enable)
+								{
+									this_l->forwarding.insert (block.link ().as_account ());
+								}
 								break;
 							default:
 								debug_assert (false);
@@ -326,7 +329,10 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				this_l->source_blocked.insert (account);
+				if (exclude_enable)
+				{
+					this_l->source_blocked.insert (account);
+				}
 				break;
 			}
 			default:
@@ -341,6 +347,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		auto iterations = 10'000;
 		if ((++counter % iterations) == 0)
 		{
+			std::cerr << "Reporting\n";
 			node->block_processor.flush ();
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();

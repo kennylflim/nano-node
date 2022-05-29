@@ -66,6 +66,8 @@ private:
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
 	static size_t constexpr backoff_exclusion = 1;
+	static bool constexpr exclude_enable{ false };
+	static bool constexpr forward_hint_enable{ false };
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
 	std::atomic<int> requests_total{ 0 };
