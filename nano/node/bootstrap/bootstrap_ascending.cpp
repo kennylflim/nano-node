@@ -136,8 +136,8 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
 	static_assert (backoff_exclusion > 0);
+	std::lock_guard<nano::mutex> lock{ mutex };
 	{
-		std::lock_guard<nano::mutex> lock{ mutex };
 		if (!forwarding.empty ())
 		{
 			auto first = forwarding.begin ();
@@ -168,7 +168,6 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		}
 	}
 	//std::cerr << accounts.size () << ' ';
-	std::lock_guard<nano::mutex> lock{ mutex };
 	/*return std::min_element (accounts.begin (), accounts.end (), [this] (decltype(accounts)::value_type const & lhs, decltype(accounts)::value_type const & rhs) {
 		return lhs.second < rhs.second;
 	})->first;*/
@@ -184,6 +183,14 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 	{
 		*i = max - *i;
 	}
+	{
+		std::string message = "Considered weights: ";
+		for (auto i: weights)
+		{
+			message += (std::to_string (i) + ' ');
+		}
+		//std::cerr << message;
+	}
 	std::discrete_distribution dist{ weights.begin (), weights.end () };
 	std::random_device random;
 	auto selection = dist (random);
@@ -194,14 +201,11 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		++iter;
 	}
 	auto result = iter->first;
-	
-	std::string message = "Considered weights: ";
-	for (auto i: weights)
+
 	{
-		message += (std::to_string (i) + ' ');
+		std::string message = boost::str (boost::format ("selected index: %1% weight %2% %3%\n") % std::to_string (selection) % std::to_string (weights[selection]) % result.to_account ());
+		//std::cerr << message;
 	}
-	message += "selected: " + (std::to_string (selection) + ' ' + result.to_account () + '\n');
-	//std::cerr << message;
 	return result;
 }
 
@@ -293,7 +297,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::progress:
 			{
 				auto account = this_l->node->ledger.account (tx, block.hash ());
-				this_l->backoff [account] = 0.0f;
+				this_l->backoff.erase (account);
 				this_l->source_blocked.erase (account);
 				auto forward = [&] () {
 					this_l->forwarding.insert (account);
