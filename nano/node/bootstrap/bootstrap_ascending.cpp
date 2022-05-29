@@ -277,13 +277,13 @@ void nano::bootstrap::bootstrap_ascending::run ()
 						
 					}
 				};
-				forward ();
+				//forward ();
 				break;
 			}
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				this_l->source_blocked.insert (account);
+				//this_l->source_blocked.insert (account);
 				break;
 			}
 			default:
