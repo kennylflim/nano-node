@@ -6,6 +6,8 @@
 
 #include <boost/format.hpp>
 
+#include <random>
+
 using namespace std::chrono_literals;
 
 nano::bootstrap::bootstrap_ascending::async_tag::async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap) :
@@ -147,7 +149,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 			}
 		}
 	}
-	std::unordered_set<nano::account> accounts;
+	decltype(backoff) accounts;
 	while (accounts.size () < backoff_exclusion)
 	{
 		++source_iterations;
@@ -156,16 +158,19 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		{
 			if (accounts.count (*account) > 0)
 			{
+				// Stop considering additional accounts if we're ever re-considering an account that's already added for consideration
 				break;
 			}
 			if (source_blocked.count (*account) == 0)
 			{
-				accounts.insert (*account);
+				accounts.emplace (*account, backoff[*account]);
 			}
 		}
 	}
 	std::lock_guard<nano::mutex> lock{ mutex };
-	return *std::min_element (accounts.begin (), accounts.end (), [this] (nano::account const & lhs, nano::account const & rhs) { return backoff[lhs] < backoff[rhs]; });
+	return std::min_element (accounts.begin (), accounts.end (), [this] (decltype(accounts)::value_type const & lhs, decltype(accounts)::value_type const & rhs) {
+		return lhs.second < rhs.second;
+	})->first;
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
