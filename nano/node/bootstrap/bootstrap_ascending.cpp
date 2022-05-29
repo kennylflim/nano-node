@@ -173,15 +173,15 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 	})->first;*/
 	
 	std::vector<decltype(backoff)::mapped_type> weights;
-	decltype(weights)::value_type max{ 0 };
+	decltype(weights)::value_type total{ 0 };
 	for (auto const & [unused, weight]: accounts)
 	{
-		max = std::max (max, weight + 1);
+		total += weight;
 		weights.push_back (weight);
 	}
 	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
 	{
-		*i = max - *i;
+		*i = std::pow((total - *i), 2.0) / total;
 	}
 	{
 		std::string message = "Considered weights: ";
