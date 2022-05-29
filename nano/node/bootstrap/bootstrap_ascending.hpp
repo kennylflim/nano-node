@@ -55,9 +55,9 @@ private:
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
 	void dump_backoff_hist ();
-	nano::account random_account_entry (nano::account const & search);
-	std::optional<nano::account> random_pending_entry (nano::account const & search);
-	std::optional<nano::account> random_ledger_account ();
+	nano::account random_account_entry (nano::transaction const & tx, nano::account const & search);
+	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
+	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
 	std::optional<nano::account> pick_account ();
 	std::unordered_set<nano::account> forwarding;
 	std::unordered_set<nano::account> source_blocked;
@@ -68,6 +68,7 @@ private:
 	static size_t constexpr backoff_exclusion = 2;
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
+	std::atomic<int> requests_total{ 0 };
 	std::atomic<int> source_iterations{ 0 };
 	std::atomic<float> weights{ 0 };
 	/// Wait for there to be space for an additional request

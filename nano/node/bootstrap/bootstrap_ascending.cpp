@@ -41,6 +41,7 @@ void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag,
 	message.count = request_message_count;
 	//std::cerr << boost::str (boost::format ("Request sent for: %1% to: %2%\n") % message.start.to_string () % ctx.first->remote_endpoint ());
 	auto channel = ctx.second;
+	++requests_total;
 	channel->send (message, [this_l = shared (), tag, ctx] (boost::system::error_code const & ec, std::size_t size) {
 		this_l->read_block (tag, ctx);
 	});
@@ -90,9 +91,8 @@ void nano::bootstrap::bootstrap_ascending::dump_backoff_hist ()
 	std::cerr << output;
 }
 
-nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::account const & search)
+nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::transaction const & tx, nano::account const & search)
 {
-	auto tx = node->store.tx_begin_read ();
 	auto existing_account = node->store.account.begin (tx, search);
 	if (existing_account == node->store.account.end ())
 	{
@@ -103,9 +103,8 @@ nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::
 	return existing_account->first;
 }
 
-std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_pending_entry (nano::account const & search)
+std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_pending_entry (nano::transaction const & tx, nano::account const & search)
 {
-	auto tx = node->store.tx_begin_read ();
 	auto existing_pending = node->store.pending.begin (tx, nano::pending_key{ search, 0 });
 	std::optional<nano::account> result;
 	if (existing_pending != node->store.pending.end ())
@@ -115,7 +114,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_pendin
 	return result;
 }
 
-std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger_account ()
+std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger_account (nano::transaction const & tx)
 {
 	nano::account search;
 	nano::random_pool::generate_block (search.bytes.data (), search.bytes.size ());
@@ -124,12 +123,12 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 	if (rand & 0x1)
 	{
 		//std::cerr << boost::str (boost::format ("account "));
-		return random_account_entry (search);
+		return random_account_entry (tx, search);
 	}
 	else
 	{
 		//std::cerr << boost::str (boost::format ("pending "));
-		return random_pending_entry (search);
+		return random_pending_entry (tx, search);
 	}
 }
 
@@ -149,11 +148,12 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 			}
 		}
 	}
+	auto tx = node->store.tx_begin_read ();
 	decltype(backoff) accounts;
 	while (accounts.size () < backoff_exclusion)
 	{
 		++source_iterations;
-		auto account = random_ledger_account ();
+		auto account = random_ledger_account (tx);
 		if (account)
 		{
 			if (accounts.count (*account) > 0)
@@ -343,7 +343,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
 			std::lock_guard<nano::mutex> lock{ mutex };
-			std::cerr << boost::str (boost::format ("Forwarding: %1% source blocked: %2% source iterations: %3% responses: %4% response rate %5%\n") % forwarding.size () % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
+			std::cerr << boost::str (boost::format ("Requests total: %1% forwarding: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6%\n") % requests_total.load () % forwarding.size () % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
 			responses = source_iterations = 0;
 		}
 	}

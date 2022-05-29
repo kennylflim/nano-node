@@ -359,7 +359,7 @@ void nano::block_processor::dump_result_hist ()
 		}
 	}
 	result += '\n';
-	result += boost::str (boost::format ("total: %1%\ngap_source: %2% gap source rate: %3%\ngap_previous: %4% gap previous rate: %5%\n") % processed_count % gap_source_count % (static_cast<double> (gap_source_count) / processed_count) % gap_previous_count % (static_cast<double> (gap_previous_count) / processed_count));
+	result += boost::str (boost::format ("total: %1% gap_source: %2% gap source rate: %3%\ngap_previous: %4% gap previous rate: %5%\n") % processed_count % gap_source_count % (static_cast<double> (gap_source_count) / processed_count) % gap_previous_count % (static_cast<double> (gap_previous_count) / processed_count));
 	std::cerr << result;
 	result_hist.clear ();
 }
