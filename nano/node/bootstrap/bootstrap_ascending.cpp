@@ -82,7 +82,7 @@ void nano::bootstrap::bootstrap_ascending::dump_backoff_hist ()
 		++weight_counts[index];
 	}
 	std::string output;
-	output += "Backoff hist (" + std::to_string (backoff.size ()) + "): ";
+	output += "Backoff hist (size: " + std::to_string (backoff.size ()) + "): ";
 	for (size_t i = 0, n = weight_counts.size (); i < n; ++i)
 	{
 		output += std::to_string (weight_counts[i]) + ' ';
@@ -150,13 +150,14 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 	}
 	auto tx = node->store.tx_begin_read ();
 	decltype(backoff) accounts;
+	auto iterations{ 0 };
 	while (accounts.size () < backoff_exclusion)
 	{
 		++source_iterations;
 		auto account = random_ledger_account (tx);
 		if (account)
 		{
-			if (accounts.count (*account) > 0)
+			if (backoff_exclusion < iterations++ && accounts.count (*account) > 0)
 			{
 				// Stop considering additional accounts if we're ever re-considering an account that's already added for consideration
 				break;
@@ -181,7 +182,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 	}
 	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
 	{
-		*i = std::pow((total - *i), 2.0) / total;
+		*i = std::pow(2.0, total - *i) / total;
 	}
 	{
 		std::string message = "Considered weights: ";
@@ -300,6 +301,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 				this_l->backoff.erase (account);
 				this_l->source_blocked.erase (account);
 				auto forward = [&] () {
+					++this_l->forwarded;
 					this_l->forwarding.insert (account);
 					if (this_l->node->ledger.is_send (tx, block))
 					{
@@ -318,13 +320,13 @@ void nano::bootstrap::bootstrap_ascending::run ()
 						
 					}
 				};
-				//forward ();
+				forward ();
 				break;
 			}
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				//this_l->source_blocked.insert (account);
+				this_l->source_blocked.insert (account);
 				break;
 			}
 			default:
@@ -343,7 +345,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
 			std::lock_guard<nano::mutex> lock{ mutex };
-			std::cerr << boost::str (boost::format ("Requests total: %1% forwarding: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6%\n") % requests_total.load () % forwarding.size () % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
+			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
 			responses = source_iterations = 0;
 		}
 	}
