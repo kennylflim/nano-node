@@ -65,10 +65,11 @@ private:
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 1;
-	static size_t constexpr backoff_exclusion = 2;
+	static size_t constexpr backoff_exclusion = 1;
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
 	std::atomic<int> source_iterations{ 0 };
+	std::atomic<float> weights{ 0 };
 	/// Wait for there to be space for an additional request
 	bool wait_available_request ();
 };

@@ -167,10 +167,42 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 			}
 		}
 	}
+	//std::cerr << accounts.size () << ' ';
 	std::lock_guard<nano::mutex> lock{ mutex };
-	return std::min_element (accounts.begin (), accounts.end (), [this] (decltype(accounts)::value_type const & lhs, decltype(accounts)::value_type const & rhs) {
+	/*return std::min_element (accounts.begin (), accounts.end (), [this] (decltype(accounts)::value_type const & lhs, decltype(accounts)::value_type const & rhs) {
 		return lhs.second < rhs.second;
-	})->first;
+	})->first;*/
+	
+	std::vector<decltype(backoff)::mapped_type> weights;
+	decltype(weights)::value_type max{ 0 };
+	for (auto const & [unused, weight]: accounts)
+	{
+		max = std::max (max, weight + 1);
+		weights.push_back (weight);
+	}
+	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
+	{
+		*i = max - *i;
+	}
+	std::discrete_distribution dist{ weights.begin (), weights.end () };
+	std::random_device random;
+	auto selection = dist (random);
+	debug_assert (!weights.empty () && selection < weights.size ());
+	auto iter = accounts.begin ();
+	for (auto i = 0; i < selection; ++i)
+	{
+		++iter;
+	}
+	auto result = iter->first;
+	
+	std::string message = "Considered weights: ";
+	for (auto i: weights)
+	{
+		message += (std::to_string (i) + ' ');
+	}
+	message += "selected: " + (std::to_string (selection) + ' ' + result.to_account () + '\n');
+	//std::cerr << message;
+	return result;
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
