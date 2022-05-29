@@ -61,7 +61,7 @@ private:
 	std::optional<nano::account> pick_account ();
 	std::unordered_set<nano::account> forwarding;
 	std::unordered_set<nano::account> source_blocked;
-	std::unordered_map<nano::account, uint32_t> backoff;
+	std::unordered_map<nano::account, float> backoff;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 1;

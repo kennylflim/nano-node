@@ -200,7 +200,7 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		return;
 	}
 	auto existing = backoff [*account];
-	auto updated = existing + 1;
+	auto updated = existing + 1.0f;
 	if (updated < existing)
 	{
 		updated = std::numeric_limits<decltype(updated)>::max ();
@@ -261,7 +261,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			case nano::process_result::progress:
 			{
 				auto account = this_l->node->ledger.account (tx, block.hash ());
-				this_l->backoff [account] = 0;
+				this_l->backoff [account] = 0.0f;
 				this_l->source_blocked.erase (account);
 				auto forward = [&] () {
 					this_l->forwarding.insert (account);
