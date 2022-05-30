@@ -91,6 +91,27 @@ void nano::bootstrap::bootstrap_ascending::dump_backoff_hist ()
 	std::cerr << output;
 }
 
+void nano::bootstrap::bootstrap_ascending::dump_gap_previous_hist ()
+{
+	std::multimap<float, nano::block_hash, std::greater<float>> top;
+	
+	for (auto const &[account, occurance]: gap_previous_occurance)
+	{
+		top.emplace (occurance, account);
+	}
+	
+	std::string message;
+	message += (std::string ("Gap previous hist:\n"));
+	auto iterations{ 0 };
+	for (auto i = top.begin (), n = top.end (); iterations < 16 && i != n; ++i, ++iterations)
+	{
+		auto &[weight, account] = *i;
+		message += (account.to_string () + ':' + std::to_string (weight) + '\n');
+	}
+	message += "Gap previous hist end:\n";
+	std::cerr << message;
+}
+
 nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::transaction const & tx, nano::account const & search)
 {
 	auto existing_account = node->store.account.begin (tx, search);
@@ -236,13 +257,15 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		return;
 	}
-	auto existing = backoff [*account];
-	auto updated = existing + 1.0f;
-	if (updated < existing)
 	{
-		updated = std::numeric_limits<decltype(updated)>::max ();
+		auto existing = backoff [*account];
+		auto updated = existing + 1.0f;
+		if (updated < existing)
+		{
+			updated = std::numeric_limits<decltype(updated)>::max ();
+		}
+		backoff[*account] = updated;
 	}
-	backoff[*account] = updated;
 	nano::account_info info;
 	nano::hash_or_account start = *account;
 	if (!node->store.account.get (node->store.tx_begin_read (), *account, info))
@@ -323,17 +346,24 @@ void nano::bootstrap::bootstrap_ascending::run ()
 						
 					}
 				};
-				forward ();
+				if (forward_hint_enable)
+				{
+					forward ();
+				}
 				break;
 			}
 			case nano::process_result::gap_source:
 			{
 				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				if (exclude_enable)
+				if (source_block_enable)
 				{
 					this_l->source_blocked.insert (account);
 				}
 				break;
+			}
+			case nano::process_result::gap_previous:
+			{
+				this_l->gap_previous_occurance[block.hash ()] += 1;
 			}
 			default:
 				break;
@@ -354,6 +384,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			std::lock_guard<nano::mutex> lock{ mutex };
 			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
 			responses = source_iterations = 0;
+			dump_gap_previous_hist ();
 		}
 	}
 	

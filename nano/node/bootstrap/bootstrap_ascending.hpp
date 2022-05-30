@@ -55,6 +55,7 @@ private:
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
 	void dump_backoff_hist ();
+	void dump_gap_previous_hist ();
 	nano::account random_account_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
@@ -62,12 +63,13 @@ private:
 	std::unordered_set<nano::account> forwarding;
 	std::unordered_set<nano::account> source_blocked;
 	std::unordered_map<nano::account, float> backoff;
+	std::unordered_map<nano::block_hash, float> gap_previous_occurance;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
 	static size_t constexpr backoff_exclusion = 1;
-	static bool constexpr exclude_enable{ false };
-	static bool constexpr forward_hint_enable{ false };
+	static bool constexpr source_block_enable{ true };
+	static bool constexpr forward_hint_enable{ true };
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
 	std::atomic<int> requests_total{ 0 };
