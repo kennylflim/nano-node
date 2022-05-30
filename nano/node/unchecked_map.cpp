@@ -110,6 +110,7 @@ void nano::unchecked_map::item_visitor::operator() (query const & item)
 		auto const & info = i->second;
 		delete_queue.push_back (key);
 		unchecked.satisfied (info);
+		++unchecked.satisfied_total;
 	}
 	if (!unchecked.disable_delete)
 	{

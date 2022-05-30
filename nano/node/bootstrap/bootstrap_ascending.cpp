@@ -6,8 +6,6 @@
 
 #include <boost/format.hpp>
 
-#include <random>
-
 using namespace std::chrono_literals;
 
 nano::bootstrap::bootstrap_ascending::async_tag::async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap) :
@@ -89,27 +87,6 @@ void nano::bootstrap::bootstrap_ascending::dump_backoff_hist ()
 	}
 	output += '\n';
 	std::cerr << output;
-}
-
-void nano::bootstrap::bootstrap_ascending::dump_gap_previous_hist ()
-{
-	std::multimap<float, nano::block_hash, std::greater<float>> top;
-	
-	for (auto const &[account, occurance]: gap_previous_occurance)
-	{
-		top.emplace (occurance, account);
-	}
-	
-	std::string message;
-	message += (std::string ("Gap previous hist:\n"));
-	auto iterations{ 0 };
-	for (auto i = top.begin (), n = top.end (); iterations < 16 && i != n; ++i, ++iterations)
-	{
-		auto &[weight, account] = *i;
-		message += (account.to_string () + ':' + std::to_string (weight) + '\n');
-	}
-	message += "Gap previous hist end:\n";
-	std::cerr << message;
 }
 
 nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::transaction const & tx, nano::account const & search)
@@ -214,7 +191,6 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		//std::cerr << message;
 	}
 	std::discrete_distribution dist{ weights.begin (), weights.end () };
-	std::random_device random;
 	auto selection = dist (random);
 	debug_assert (!weights.empty () && selection < weights.size ());
 	auto iter = accounts.begin ();
@@ -363,7 +339,6 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			}
 			case nano::process_result::gap_previous:
 			{
-				this_l->gap_previous_occurance[block.hash ()] += 1;
 			}
 			default:
 				break;
@@ -381,10 +356,29 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			node->block_processor.flush ();
 			node->block_processor.dump_result_hist ();
 			dump_backoff_hist ();
+			{
+				std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
+				std::vector<int> hist;
+				for (auto const &[hash, occurance]: node->block_processor.process_history)
+				{
+					if (hist.size () <= occurance)
+					{
+						hist.resize (occurance + 1);
+					}
+					++hist[occurance];
+				}
+				std::string message = boost::str (boost::format ("Process frequency hist(%1%): ") % hist.size ());
+				auto iterations{ 0 };
+				for (auto i: hist)
+				{
+					message += (std::to_string (i) + ' ');
+				}
+				message += '\n';
+				std::cerr << message;
+			}
 			std::lock_guard<nano::mutex> lock{ mutex };
-			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations));
+			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6% satisfied %7%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
 			responses = source_iterations = 0;
-			dump_gap_previous_hist ();
 		}
 	}
 	

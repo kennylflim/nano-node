@@ -361,7 +361,7 @@ void nano::block_processor::dump_result_hist ()
 	result += '\n';
 	result += boost::str (boost::format ("total: %1% gap_source: %2% gap source rate: %3%\ngap_previous: %4% gap previous rate: %5%\n") % processed_count % gap_source_count % (static_cast<double> (gap_source_count) / processed_count) % gap_previous_count % (static_cast<double> (gap_previous_count) / processed_count));
 	std::cerr << result;
-	result_hist.clear ();
+	//result_hist.clear ();
 }
 
 nano::process_return nano::block_processor::process_one (nano::write_transaction const & transaction_a, block_post_events & events_a, nano::unchecked_info info_a, bool const forced_a, nano::block_origin const origin_a)
@@ -376,6 +376,11 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 	events_a.events.emplace_back ([this, result, block = info_a.block] (nano::transaction const & tx) {
 		processed.notify (tx, result, *block);
 	});
+	{
+		std::lock_guard<std::mutex> lock{ hist_mutex };
+		auto & val = process_history[hash];
+		++val;
+	}
 	switch (result.code)
 	{
 		case nano::process_result::progress:
@@ -438,7 +443,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 			info_a.verified = result.verified;
 			node.unchecked.put (block->account (), info_a); // Specific unchecked key starting with epoch open block account public key
 			node.stats.inc (nano::stat::type::ledger, nano::stat::detail::gap_source);
-			break;
+				break;
 		}
 		case nano::process_result::old:
 		{

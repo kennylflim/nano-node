@@ -2,6 +2,7 @@
 
 #include <nano/node/bootstrap/bootstrap_attempt.hpp>
 
+#include <random>
 #include <thread>
 
 namespace nano
@@ -55,7 +56,6 @@ private:
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
 	void dump_backoff_hist ();
-	void dump_gap_previous_hist ();
 	nano::account random_account_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
@@ -63,11 +63,11 @@ private:
 	std::unordered_set<nano::account> forwarding;
 	std::unordered_set<nano::account> source_blocked;
 	std::unordered_map<nano::account, float> backoff;
-	std::unordered_map<nano::block_hash, float> gap_previous_occurance;
+	std::random_device random;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
-	static size_t constexpr request_message_count = 16;
-	static size_t constexpr backoff_exclusion = 1;
+	static size_t constexpr request_message_count = 256;
+	static size_t constexpr backoff_exclusion = 16;
 	static bool constexpr source_block_enable{ true };
 	static bool constexpr forward_hint_enable{ true };
 	std::atomic<int> responses{ 0 };
@@ -76,6 +76,7 @@ private:
 	std::atomic<int> source_iterations{ 0 };
 	std::atomic<float> weights{ 0 };
 	std::atomic<int> forwarded{ 0 };
+	std::atomic<int> block_total{ 0 };
 	/// Wait for there to be space for an additional request
 	bool wait_available_request ();
 };
