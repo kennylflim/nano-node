@@ -25,6 +25,8 @@ class bootstrap_ascending : public nano::bootstrap_attempt
 		void dump_backoff_hist ();
 
 		static size_t constexpr backoff_exclusion = 16;
+		float selected_min{ 1.0 };
+		float selected_max{ 0.0 };
 	private:
 		void increase (nano::account const & account);
 

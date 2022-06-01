@@ -39,16 +39,14 @@ nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() (
 {
 	std::vector<decltype(backoff)::mapped_type> weights;
 	std::vector<nano::account> candidates;
-	decltype(weights)::value_type total{ 0 };
 	for (auto const & [account, weight]: accounts)
 	{
-		total += weight;
 		weights.push_back (weight);
 		candidates.push_back (account);
 	}
 	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
 	{
-		*i = 1.0 / std::pow(2.0, total - *i);
+		*i = 1.0 / std::pow (2.0, *i);
 	}
 	{
 		std::string message = "Considered weights: ";
@@ -65,8 +63,10 @@ nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() (
 	auto result = candidates[selection];
 	std::string message = boost::str (boost::format ("selected index: %1% weight %2% %3%\n") % std::to_string (selection) % std::to_string (weights[selection]) % result.to_account ());
 	//std::cerr << message;
-	increase (result);
+	selected_min = std::min (selected_min, weights[selection]);
+	selected_max = std::max (selected_max, weights[selection]);
 	accounts.clear ();
+	increase (result);
 	return result;
 }
 
@@ -372,8 +372,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		auto iterations = 10'000;
 		if ((++counter % iterations) == 0)
 		{
-			std::cerr << "Reporting\n";
-			node->block_processor.flush ();
+			std::cerr << "Flushing ... "; node->block_processor.flush (); std::cerr << "done\n";
 			node->block_processor.dump_result_hist ();
 			{
 				std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
@@ -397,7 +396,9 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			}
 			std::lock_guard<nano::mutex> lock{ mutex };
 			backoff.dump_backoff_hist ();
-			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6% satisfied %7%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
+			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% selected min %5% selected_max %6% response rate %7% satisfied %8%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % backoff.selected_min % backoff.selected_max % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
+			backoff.selected_min = 1.0;
+			backoff.selected_max = 0.0;
 			responses = source_iterations = 0;
 		}
 	}
