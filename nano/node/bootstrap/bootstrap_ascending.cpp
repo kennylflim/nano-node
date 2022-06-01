@@ -8,6 +8,102 @@
 
 using namespace std::chrono_literals;
 
+
+bool nano::bootstrap::bootstrap_ascending::backoff_counts::insert (nano::account const & account)
+{
+	static_assert (backoff_exclusion > 0);
+	if (backoff_exclusion <= accounts.size ())
+	{
+		return true;
+	}
+	if (backoff_exclusion < attempts++ && accounts.count (account) > 0)
+	{
+		return true;
+	}
+	accounts[account] = backoff[account];
+	return false;
+}
+
+void nano::bootstrap::bootstrap_ascending::backoff_counts::increase (nano::account const & account)
+{
+	auto existing = backoff [account];
+	auto updated = existing + 1.0f;
+	if (updated < existing)
+	{
+		updated = std::numeric_limits<decltype(updated)>::max ();
+	}
+	backoff[account] = updated;
+}
+
+nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() ()
+{
+	std::vector<decltype(backoff)::mapped_type> weights;
+	std::vector<nano::account> candidates;
+	decltype(weights)::value_type total{ 0 };
+	for (auto const & [account, weight]: accounts)
+	{
+		total += weight;
+		weights.push_back (weight);
+		candidates.push_back (account);
+	}
+	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
+	{
+		*i = 1.0 / std::pow(2.0, total - *i);
+	}
+	{
+		std::string message = "Considered weights: ";
+		for (auto i: weights)
+		{
+			message += (std::to_string (i) + ' ');
+		}
+		message += '\n';
+		//std::cerr << message;
+	}
+	std::discrete_distribution dist{ weights.begin (), weights.end () };
+	auto selection = dist (random);
+	debug_assert (!weights.empty () && selection < weights.size ());
+	auto result = candidates[selection];
+	std::string message = boost::str (boost::format ("selected index: %1% weight %2% %3%\n") % std::to_string (selection) % std::to_string (weights[selection]) % result.to_account ());
+	//std::cerr << message;
+	increase (result);
+	accounts.clear ();
+	return result;
+}
+
+void nano::bootstrap::bootstrap_ascending::backoff_counts::erase (nano::account const & account)
+{
+	backoff.erase (account);
+}
+
+bool nano::bootstrap::bootstrap_ascending::backoff_counts::empty () const
+{
+	return accounts.empty ();
+}
+
+void nano::bootstrap::bootstrap_ascending::backoff_counts::dump_backoff_hist ()
+{
+	std::vector<size_t> weight_counts;
+	for (auto &[account, count]: backoff)
+	{
+		auto log = std::log2 (std::max<decltype(count)> (count, 1));
+		//std::cerr << "log: " << log << ' ';
+		auto index = static_cast<size_t> (log);
+		if (weight_counts.size () <= index)
+		{
+			weight_counts.resize (index + 1);
+		}
+		++weight_counts[index];
+	}
+	std::string output;
+	output += "Backoff hist (size: " + std::to_string (backoff.size ()) + "): ";
+	for (size_t i = 0, n = weight_counts.size (); i < n; ++i)
+	{
+		output += std::to_string (weight_counts[i]) + ' ';
+	}
+	output += '\n';
+	std::cerr << output;
+}
+
 nano::bootstrap::bootstrap_ascending::async_tag::async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap) :
 	bootstrap{ bootstrap }
 {
@@ -64,31 +160,6 @@ void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag
 	});
 }
 
-void nano::bootstrap::bootstrap_ascending::dump_backoff_hist ()
-{
-	std::vector<size_t> weight_counts;
-	std::lock_guard<nano::mutex> lock{ mutex };
-	for (auto &[account, count]: backoff)
-	{
-		auto log = std::log2 (std::max<decltype(count)> (count, 1));
-		//std::cerr << "log: " << log << ' ';
-		auto index = static_cast<size_t> (log);
-		if (weight_counts.size () <= index)
-		{
-			weight_counts.resize (index + 1);
-		}
-		++weight_counts[index];
-	}
-	std::string output;
-	output += "Backoff hist (size: " + std::to_string (backoff.size ()) + "): ";
-	for (size_t i = 0, n = weight_counts.size (); i < n; ++i)
-	{
-		output += std::to_string (weight_counts[i]) + ' ';
-	}
-	output += '\n';
-	std::cerr << output;
-}
-
 nano::account nano::bootstrap::bootstrap_ascending::random_account_entry (nano::transaction const & tx, nano::account const & search)
 {
 	auto existing_account = node->store.account.begin (tx, search);
@@ -132,7 +203,6 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
-	static_assert (backoff_exclusion > 0);
 	std::lock_guard<nano::mutex> lock{ mutex };
 	{
 		if (!forwarding.empty ())
@@ -147,64 +217,23 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		}
 	}
 	auto tx = node->store.tx_begin_read ();
-	decltype(backoff) accounts;
 	auto iterations{ 0 };
-	while (accounts.size () < backoff_exclusion)
+	while (iterations < backoff_counts::backoff_exclusion * 2)
 	{
 		++source_iterations;
 		auto account = random_ledger_account (tx);
 		if (account)
 		{
-			if (backoff_exclusion < iterations++ && accounts.count (*account) > 0)
-			{
-				// Stop considering additional accounts if we're ever re-considering an account that's already added for consideration
-				break;
-			}
 			if (source_blocked.count (*account) == 0)
 			{
-				accounts.emplace (*account, backoff[*account]);
+				if (backoff.insert (*account))
+				{
+					break;
+				}
 			}
 		}
 	}
-	//std::cerr << accounts.size () << ' ';
-	/*return std::min_element (accounts.begin (), accounts.end (), [this] (decltype(accounts)::value_type const & lhs, decltype(accounts)::value_type const & rhs) {
-		return lhs.second < rhs.second;
-	})->first;*/
-	
-	std::vector<decltype(backoff)::mapped_type> weights;
-	decltype(weights)::value_type total{ 0 };
-	for (auto const & [unused, weight]: accounts)
-	{
-		total += weight;
-		weights.push_back (weight);
-	}
-	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
-	{
-		*i = std::pow(2.0, total - *i) / total;
-	}
-	{
-		std::string message = "Considered weights: ";
-		for (auto i: weights)
-		{
-			message += (std::to_string (i) + ' ');
-		}
-		//std::cerr << message;
-	}
-	std::discrete_distribution dist{ weights.begin (), weights.end () };
-	auto selection = dist (random);
-	debug_assert (!weights.empty () && selection < weights.size ());
-	auto iter = accounts.begin ();
-	for (auto i = 0; i < selection; ++i)
-	{
-		++iter;
-	}
-	auto result = iter->first;
-
-	{
-		std::string message = boost::str (boost::format ("selected index: %1% weight %2% %3%\n") % std::to_string (selection) % std::to_string (weights[selection]) % result.to_account ());
-		//std::cerr << message;
-	}
-	return result;
+	return backoff ();
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
@@ -232,15 +261,6 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	if (!account)
 	{
 		return;
-	}
-	{
-		auto existing = backoff [*account];
-		auto updated = existing + 1.0f;
-		if (updated < existing)
-		{
-			updated = std::numeric_limits<decltype(updated)>::max ();
-		}
-		backoff[*account] = updated;
 	}
 	nano::account_info info;
 	nano::hash_or_account start = *account;
@@ -355,7 +375,6 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			std::cerr << "Reporting\n";
 			node->block_processor.flush ();
 			node->block_processor.dump_result_hist ();
-			dump_backoff_hist ();
 			{
 				std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
 				std::vector<int> hist;
@@ -377,6 +396,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 				std::cerr << message;
 			}
 			std::lock_guard<nano::mutex> lock{ mutex };
+			backoff.dump_backoff_hist ();
 			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% responses: %5% response rate %6% satisfied %7%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % responses.load () % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
 			responses = source_iterations = 0;
 		}

@@ -15,6 +15,24 @@ namespace bootstrap
 {
 class bootstrap_ascending : public nano::bootstrap_attempt
 {
+	class backoff_counts
+	{
+	public:
+		bool insert (nano::account const & account);
+		nano::account operator() ();
+		void erase (nano::account const & account);
+		bool empty () const;
+		void dump_backoff_hist ();
+
+		static size_t constexpr backoff_exclusion = 16;
+	private:
+		void increase (nano::account const & account);
+
+		std::random_device random;
+		std::unordered_map<nano::account, float> backoff;
+		decltype(backoff) accounts;
+		size_t attempts{ 0 };
+	};
 	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
 	public:
@@ -55,19 +73,17 @@ private:
 	void request_one ();
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
-	void dump_backoff_hist ();
 	nano::account random_account_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
 	std::optional<nano::account> pick_account ();
+
+	backoff_counts backoff;
 	std::unordered_set<nano::account> forwarding;
 	std::unordered_set<nano::account> source_blocked;
-	std::unordered_map<nano::account, float> backoff;
-	std::random_device random;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 256;
-	static size_t constexpr backoff_exclusion = 16;
 	static bool constexpr source_block_enable{ true };
 	static bool constexpr forward_hint_enable{ true };
 	std::atomic<int> responses{ 0 };
