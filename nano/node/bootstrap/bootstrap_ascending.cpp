@@ -24,17 +24,6 @@ bool nano::bootstrap::bootstrap_ascending::backoff_counts::insert (nano::account
 	return false;
 }
 
-void nano::bootstrap::bootstrap_ascending::backoff_counts::increase (nano::account const & account)
-{
-	auto existing = backoff [account];
-	auto updated = existing + 1.0f;
-	if (updated < existing)
-	{
-		updated = std::numeric_limits<decltype(updated)>::max ();
-	}
-	backoff[account] = updated;
-}
-
 nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() ()
 {
 	std::vector<decltype(backoff)::mapped_type> weights;
@@ -63,10 +52,8 @@ nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() (
 	auto result = candidates[selection];
 	std::string message = boost::str (boost::format ("selected index: %1% weight %2% %3%\n") % std::to_string (selection) % std::to_string (weights[selection]) % result.to_account ());
 	//std::cerr << message;
-	selected_min = std::min (selected_min, weights[selection]);
-	selected_max = std::max (selected_max, weights[selection]);
 	accounts.clear ();
-	increase (result);
+	backoff[result] += 1.0;
 	return result;
 }
 
@@ -396,9 +383,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 			}
 			std::lock_guard<nano::mutex> lock{ mutex };
 			backoff.dump_backoff_hist ();
-			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% selected min %5% selected_max %6% response rate %7% satisfied %8%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % backoff.selected_min % backoff.selected_max % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
-			backoff.selected_min = 1.0;
-			backoff.selected_max = 0.0;
+			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% response rate %5% satisfied %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
 			responses = source_iterations = 0;
 		}
 	}
