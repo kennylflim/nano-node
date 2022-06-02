@@ -70,6 +70,17 @@ private:
 		std::unordered_set<nano::account> forwarding;
 		bootstrap_ascending & bootstrap;
 	};
+	class source_blocking
+	{
+	public:
+		size_t size () const;
+		bool blocked (nano::account const & account) const;
+		void erase (nano::account const & account);
+		void insert (nano::account const & account);
+	private:
+		static bool constexpr enabled{ true };
+		std::unordered_set<nano::account> accounts;
+	};
 	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
 	public:
@@ -87,17 +98,16 @@ private:
 	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
 	std::optional<nano::account> pick_account ();
-	bool queryable (nano::account const & account);
+	bool blocked (nano::account const & account);
 	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);
 	void dump_stats ();
 
 	backoff_counts backoff;
 	progress_forwarding forwarding;
-	std::unordered_set<nano::account> source_blocked;
+	source_blocking source;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
-	static bool constexpr source_block_enable{ true };
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
 	std::atomic<int> requests_total{ 0 };

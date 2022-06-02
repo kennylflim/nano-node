@@ -100,7 +100,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::progress_forw
 {
 	for (auto const & account: forwarding)
 	{
-		if (bootstrap.queryable (account))
+		if (!bootstrap.blocked (account))
 		{
 			++bootstrap.forwarded;
 			forwarding.erase (account);
@@ -115,6 +115,30 @@ void nano::bootstrap::bootstrap_ascending::progress_forwarding::insert (nano::ac
 	if (enabled)
 	{
 		forwarding.insert (account);
+	}
+}
+
+
+size_t nano::bootstrap::bootstrap_ascending::source_blocking::size () const
+{
+	return accounts.size ();
+}
+
+bool nano::bootstrap::bootstrap_ascending::source_blocking::blocked (nano::account const & account) const
+{
+	return accounts.find (account) != accounts.end ();
+}
+
+void nano::bootstrap::bootstrap_ascending::source_blocking::erase (nano::account const & account)
+{
+	accounts.erase (account);
+}
+
+void nano::bootstrap::bootstrap_ascending::source_blocking::insert (nano::account const & account)
+{
+	if (enabled)
+	{
+		accounts.insert (account);
 	}
 }
 
@@ -231,7 +255,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		auto account = random_ledger_account (tx);
 		if (account)
 		{
-			if (queryable (*account))
+			if (!blocked (*account))
 			{
 				if (backoff.insert (*account))
 				{
@@ -243,9 +267,9 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 	return backoff ();
 }
 
-bool nano::bootstrap::bootstrap_ascending::queryable (nano::account const & account)
+bool nano::bootstrap::bootstrap_ascending::blocked (nano::account const & account)
 {
-	return source_blocked.count (account) == 0;
+	return source.blocked (account);
 }
 
 void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block)
@@ -257,7 +281,7 @@ void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx
 		{
 			auto account = node->ledger.account (tx, block.hash ());
 			backoff.erase (account);
-			source_blocked.erase (account);
+			source.erase (account);
 			forwarding.insert (account);
 			if (node->ledger.is_send (tx, block))
 			{
@@ -280,10 +304,7 @@ void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx
 		case nano::process_result::gap_source:
 		{
 			auto account = block.previous ().is_zero () ? block.account () : node->ledger.account (tx, block.previous ());
-			if (source_block_enable)
-			{
-				source_blocked.insert (account);
-			}
+			source.insert (account);
 			break;
 		}
 		case nano::process_result::gap_previous:
@@ -320,7 +341,7 @@ void nano::bootstrap::bootstrap_ascending::dump_stats ()
 	}
 	std::lock_guard<nano::mutex> lock{ mutex };
 	backoff.dump_backoff_hist ();
-	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied: %5% responses: %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % node->unchecked.satisfied_total.load () % responses.load ());
+	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied: %5% responses: %6%\n") % requests_total.load () % forwarded % source.size () % source_iterations.load () % node->unchecked.satisfied_total.load () % responses.load ());
 	responses = source_iterations = 0;
 }
 
