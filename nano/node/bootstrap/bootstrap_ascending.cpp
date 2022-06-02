@@ -91,6 +91,33 @@ void nano::bootstrap::bootstrap_ascending::backoff_counts::dump_backoff_hist ()
 	std::cerr << output;
 }
 
+nano::bootstrap::bootstrap_ascending::progress_forwarding::progress_forwarding (nano::bootstrap::bootstrap_ascending & bootstrap) :
+	bootstrap{ bootstrap }
+{
+}
+
+std::optional<nano::account> nano::bootstrap::bootstrap_ascending::progress_forwarding::operator() ()
+{
+	for (auto const & account: forwarding)
+	{
+		if (bootstrap.queryable (account))
+		{
+			++bootstrap.forwarded;
+			forwarding.erase (account);
+			return account;
+		}
+	}
+	return std::nullopt;
+}
+
+void nano::bootstrap::bootstrap_ascending::progress_forwarding::insert (nano::account const & account)
+{
+	if (enabled)
+	{
+		forwarding.insert (account);
+	}
+}
+
 nano::bootstrap::bootstrap_ascending::async_tag::async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap) :
 	bootstrap{ bootstrap }
 {
@@ -191,17 +218,10 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::random_ledger
 std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account ()
 {
 	std::lock_guard<nano::mutex> lock{ mutex };
+	auto account = forwarding ();
+	if (account)
 	{
-		if (!forwarding.empty ())
-		{
-			auto first = forwarding.begin ();
-			auto account = *first;
-			forwarding.erase (first);
-			if (queryable (account))
-			{
-				return account;
-			}
-		}
+		return account;
 	}
 	auto tx = node->store.tx_begin_read ();
 	auto iterations{ 0 };
@@ -236,7 +256,8 @@ bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
 }
 
 nano::bootstrap::bootstrap_ascending::bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a) :
-	bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id_a }
+	bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id_a },
+	forwarding{ *this }
 {
 	std::cerr << '\0';
 }
@@ -311,32 +332,22 @@ void nano::bootstrap::bootstrap_ascending::run ()
 				auto account = this_l->node->ledger.account (tx, block.hash ());
 				this_l->backoff.erase (account);
 				this_l->source_blocked.erase (account);
-				auto forward = [&] () {
-					++this_l->forwarded;
-					this_l->forwarding.insert (account);
-					if (this_l->node->ledger.is_send (tx, block))
-					{
-						switch (block.type ())
-						{
-							case nano::block_type::send:
-								this_l->forwarding.insert (block.destination ());
-								break;
-							case nano::block_type::state:
-								if (forward_hint_enable)
-								{
-									this_l->forwarding.insert (block.link ().as_account ());
-								}
-								break;
-							default:
-								debug_assert (false);
-								break;
-						}
-						
-					}
-				};
-				if (forward_hint_enable)
+				this_l->forwarding.insert (account);
+				if (this_l->node->ledger.is_send (tx, block))
 				{
-					forward ();
+					switch (block.type ())
+					{
+						case nano::block_type::send:
+							this_l->forwarding.insert (block.destination ());
+							break;
+						case nano::block_type::state:
+							this_l->forwarding.insert (block.link ().as_account ());
+							break;
+						default:
+							debug_assert (false);
+							break;
+					}
+					
 				}
 				break;
 			}

@@ -59,6 +59,17 @@ private:
 		decltype(backoff) accounts;
 		size_t attempts{ 0 };
 	};
+	class progress_forwarding
+	{
+	public:
+		progress_forwarding (bootstrap_ascending & bootstrap);
+		std::optional<nano::account> operator() ();
+		void insert (nano::account const & account);
+	private:
+		static bool constexpr enabled{ true };
+		std::unordered_set<nano::account> forwarding;
+		bootstrap_ascending & bootstrap;
+	};
 	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
 	public:
@@ -79,13 +90,12 @@ private:
 	bool queryable (nano::account const & account);
 
 	backoff_counts backoff;
-	std::unordered_set<nano::account> forwarding;
+	progress_forwarding forwarding;
 	std::unordered_set<nano::account> source_blocked;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
-	static size_t constexpr request_message_count = 256;
+	static size_t constexpr request_message_count = 16;
 	static bool constexpr source_block_enable{ true };
-	static bool constexpr forward_hint_enable{ true };
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests{ 0 };
 	std::atomic<int> requests_total{ 0 };
