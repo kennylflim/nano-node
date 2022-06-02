@@ -88,6 +88,7 @@ private:
 	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
 	std::optional<nano::account> pick_account ();
 	bool queryable (nano::account const & account);
+	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);
 
 	backoff_counts backoff;
 	progress_forwarding forwarding;

@@ -248,6 +248,52 @@ bool nano::bootstrap::bootstrap_ascending::queryable (nano::account const & acco
 	return source_blocked.count (account) == 0;
 }
 
+void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block)
+{
+	std::lock_guard<nano::mutex> lock{ mutex };
+	switch (result.code)
+	{
+		case nano::process_result::progress:
+		{
+			auto account = node->ledger.account (tx, block.hash ());
+			backoff.erase (account);
+			source_blocked.erase (account);
+			forwarding.insert (account);
+			if (node->ledger.is_send (tx, block))
+			{
+				switch (block.type ())
+				{
+					case nano::block_type::send:
+						forwarding.insert (block.destination ());
+						break;
+					case nano::block_type::state:
+						forwarding.insert (block.link ().as_account ());
+						break;
+					default:
+						debug_assert (false);
+						break;
+				}
+				
+			}
+			break;
+		}
+		case nano::process_result::gap_source:
+		{
+			auto account = block.previous ().is_zero () ? block.account () : node->ledger.account (tx, block.previous ());
+			if (source_block_enable)
+			{
+				source_blocked.insert (account);
+			}
+			break;
+		}
+		case nano::process_result::gap_previous:
+		{
+		}
+		default:
+			break;
+	}
+}
+
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
 {
 	std::unique_lock<nano::mutex> lock{ mutex };
@@ -324,48 +370,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		{
 			return;
 		}
-		std::lock_guard<nano::mutex> lock{ this_l->mutex };
-		switch (result.code)
-		{
-			case nano::process_result::progress:
-			{
-				auto account = this_l->node->ledger.account (tx, block.hash ());
-				this_l->backoff.erase (account);
-				this_l->source_blocked.erase (account);
-				this_l->forwarding.insert (account);
-				if (this_l->node->ledger.is_send (tx, block))
-				{
-					switch (block.type ())
-					{
-						case nano::block_type::send:
-							this_l->forwarding.insert (block.destination ());
-							break;
-						case nano::block_type::state:
-							this_l->forwarding.insert (block.link ().as_account ());
-							break;
-						default:
-							debug_assert (false);
-							break;
-					}
-					
-				}
-				break;
-			}
-			case nano::process_result::gap_source:
-			{
-				auto account = block.previous ().is_zero () ? block.account () : this_l->node->ledger.account (tx, block.previous ());
-				if (source_block_enable)
-				{
-					this_l->source_blocked.insert (account);
-				}
-				break;
-			}
-			case nano::process_result::gap_previous:
-			{
-			}
-			default:
-				break;
-		}
+		this_l->inspect (tx, result, block);
 	});
 	//for (auto i = 0; !stopped && i < 5'000; ++i)
 	int counter = 0;
