@@ -15,32 +15,6 @@ namespace bootstrap
 {
 class bootstrap_ascending : public nano::bootstrap_attempt
 {
-	class backoff_counts
-	{
-	public:
-		bool insert (nano::account const & account);
-		nano::account operator() ();
-		void erase (nano::account const & account);
-		bool empty () const;
-		void dump_backoff_hist ();
-
-		static size_t constexpr backoff_exclusion = 16;
-	private:
-		std::random_device random;
-		std::unordered_map<nano::account, float> backoff;
-		decltype(backoff) accounts;
-		size_t attempts{ 0 };
-	};
-	class async_tag : public std::enable_shared_from_this<async_tag>
-	{
-	public:
-		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap);
-		~async_tag ();
-
-		std::atomic<int> blocks{ 0 };
-	private:
-		std::shared_ptr<bootstrap_ascending> bootstrap;
-	};
 	using socket_channel = std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>;
 public:
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
@@ -68,6 +42,33 @@ public:
 private:
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
+
+	class backoff_counts
+	{
+	public:
+		bool insert (nano::account const & account);
+		nano::account operator() ();
+		void erase (nano::account const & account);
+		bool empty () const;
+		void dump_backoff_hist ();
+
+		static size_t constexpr backoff_exclusion = 16;
+	private:
+		std::random_device random;
+		std::unordered_map<nano::account, float> backoff;
+		decltype(backoff) accounts;
+		size_t attempts{ 0 };
+	};
+	class async_tag : public std::enable_shared_from_this<async_tag>
+	{
+	public:
+		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap);
+		~async_tag ();
+
+		std::atomic<int> blocks{ 0 };
+	private:
+		std::shared_ptr<bootstrap_ascending> bootstrap;
+	};
 	void request_one ();
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
