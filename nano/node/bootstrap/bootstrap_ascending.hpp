@@ -52,7 +52,7 @@ private:
 		bool empty () const;
 		void dump_backoff_hist ();
 
-		static size_t constexpr backoff_exclusion = 16;
+		static size_t constexpr backoff_exclusion = 256;
 	private:
 		std::random_device random;
 		std::unordered_map<nano::account, float> backoff;
@@ -89,6 +89,7 @@ private:
 	std::optional<nano::account> pick_account ();
 	bool queryable (nano::account const & account);
 	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);
+	void dump_stats ();
 
 	backoff_counts backoff;
 	progress_forwarding forwarding;

@@ -294,6 +294,36 @@ void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx
 	}
 }
 
+void nano::bootstrap::bootstrap_ascending::dump_stats ()
+{
+	std::cerr << "Flushing ... "; node->block_processor.flush (); std::cerr << "done\n";
+	node->block_processor.dump_result_hist ();
+	{
+		std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
+		std::vector<int> hist;
+		for (auto const &[hash, occurance]: node->block_processor.process_history)
+		{
+			if (hist.size () <= occurance)
+			{
+				hist.resize (occurance + 1);
+			}
+			++hist[occurance];
+		}
+		std::string message = boost::str (boost::format ("Process frequency hist(%1%): ") % hist.size ());
+		auto iterations{ 0 };
+		for (auto i: hist)
+		{
+			message += (std::to_string (i) + ' ');
+		}
+		message += '\n';
+		std::cerr << message;
+	}
+	std::lock_guard<nano::mutex> lock{ mutex };
+	backoff.dump_backoff_hist ();
+	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied %5%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % node->unchecked.satisfied_total.load ());
+	responses = source_iterations = 0;
+}
+
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
 {
 	std::unique_lock<nano::mutex> lock{ mutex };
@@ -380,32 +410,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		auto iterations = 10'000;
 		if ((++counter % iterations) == 0)
 		{
-			std::cerr << "Flushing ... "; node->block_processor.flush (); std::cerr << "done\n";
-			node->block_processor.dump_result_hist ();
-			{
-				std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
-				std::vector<int> hist;
-				for (auto const &[hash, occurance]: node->block_processor.process_history)
-				{
-					if (hist.size () <= occurance)
-					{
-						hist.resize (occurance + 1);
-					}
-					++hist[occurance];
-				}
-				std::string message = boost::str (boost::format ("Process frequency hist(%1%): ") % hist.size ());
-				auto iterations{ 0 };
-				for (auto i: hist)
-				{
-					message += (std::to_string (i) + ' ');
-				}
-				message += '\n';
-				std::cerr << message;
-			}
-			std::lock_guard<nano::mutex> lock{ mutex };
-			backoff.dump_backoff_hist ();
-			std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% response rate %5% satisfied %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % (static_cast<double> (responses.load ()) / iterations) % node->unchecked.satisfied_total.load ());
-			responses = source_iterations = 0;
+			dump_stats ();
 		}
 	}
 	
