@@ -197,7 +197,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 			auto first = forwarding.begin ();
 			auto account = *first;
 			forwarding.erase (first);
-			if (source_blocked.count (account) == 0)
+			if (queryable (account))
 			{
 				return account;
 			}
@@ -211,7 +211,7 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		auto account = random_ledger_account (tx);
 		if (account)
 		{
-			if (source_blocked.count (*account) == 0)
+			if (queryable (*account))
 			{
 				if (backoff.insert (*account))
 				{
@@ -221,6 +221,11 @@ std::optional<nano::account> nano::bootstrap::bootstrap_ascending::pick_account 
 		}
 	}
 	return backoff ();
+}
+
+bool nano::bootstrap::bootstrap_ascending::queryable (nano::account const & account)
+{
+	return source_blocked.count (account) == 0;
 }
 
 bool nano::bootstrap::bootstrap_ascending::wait_available_request ()

@@ -76,6 +76,7 @@ private:
 	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
 	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
 	std::optional<nano::account> pick_account ();
+	bool queryable (nano::account const & account);
 
 	backoff_counts backoff;
 	std::unordered_set<nano::account> forwarding;
