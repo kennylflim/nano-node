@@ -320,7 +320,7 @@ void nano::bootstrap::bootstrap_ascending::dump_stats ()
 	}
 	std::lock_guard<nano::mutex> lock{ mutex };
 	backoff.dump_backoff_hist ();
-	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied %5%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % node->unchecked.satisfied_total.load ());
+	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied: %5% responses: %6%\n") % requests_total.load () % forwarded % source_blocked.size () % source_iterations.load () % node->unchecked.satisfied_total.load () % responses.load ());
 	responses = source_iterations = 0;
 }
 

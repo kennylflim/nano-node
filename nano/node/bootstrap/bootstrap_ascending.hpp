@@ -52,7 +52,7 @@ private:
 		bool empty () const;
 		void dump_backoff_hist ();
 
-		static size_t constexpr backoff_exclusion = 256;
+		static size_t constexpr backoff_exclusion = 16;
 	private:
 		std::random_device random;
 		std::unordered_map<nano::account, float> backoff;
