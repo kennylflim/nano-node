@@ -54,7 +54,7 @@ private:
 
 		static size_t constexpr backoff_exclusion = 16;
 	private:
-		std::random_device random;
+		std::default_random_engine random;
 		std::unordered_map<nano::account, float> backoff;
 		decltype(backoff) accounts;
 		size_t attempts{ 0 };
