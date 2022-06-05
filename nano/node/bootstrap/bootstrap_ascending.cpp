@@ -59,7 +59,8 @@ nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() (
 
 void nano::bootstrap::bootstrap_ascending::backoff_counts::erase (nano::account const & account)
 {
-	backoff.erase (account);
+	//backoff.erase (account);
+	backoff [account] = 0;
 }
 
 bool nano::bootstrap::bootstrap_ascending::backoff_counts::empty () const
@@ -319,7 +320,7 @@ void nano::bootstrap::bootstrap_ascending::dump_stats ()
 {
 	std::cerr << "Flushing ... "; node->block_processor.flush (); std::cerr << "done\n";
 	node->block_processor.dump_result_hist ();
-	{
+	/*{
 		std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
 		std::vector<int> hist;
 		for (auto const &[hash, occurance]: node->block_processor.process_history)
@@ -338,7 +339,7 @@ void nano::bootstrap::bootstrap_ascending::dump_stats ()
 		}
 		message += '\n';
 		std::cerr << message;
-	}
+	}*/
 	std::lock_guard<nano::mutex> lock{ mutex };
 	backoff.dump_backoff_hist ();
 	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied: %5% responses: %6% accounts: %7%\n") % requests_total.load () % forwarded % source.size () % source_iterations.load () % node->unchecked.satisfied_total.load () % responses.load () % node->ledger.cache.account_count.load ());

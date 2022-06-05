@@ -376,11 +376,11 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 	events_a.events.emplace_back ([this, result, block = info_a.block] (nano::transaction const & tx) {
 		processed.notify (tx, result, *block);
 	});
-	{
+	/*{
 		std::lock_guard<std::mutex> lock{ hist_mutex };
 		auto & val = process_history[hash];
 		++val;
-	}
+	}*/
 	switch (result.code)
 	{
 		case nano::process_result::progress:
