@@ -15,7 +15,6 @@ namespace bootstrap
 {
 class bootstrap_ascending : public nano::bootstrap_attempt
 {
-	using socket_channel = std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>;
 public:
 	explicit bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a);
 	
@@ -40,6 +39,7 @@ public:
 		std::cerr << '\0';
 	}
 private:
+	using socket_channel = std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>;
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
 

@@ -37,21 +37,10 @@ nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() (
 	{
 		*i = 1.0 / std::pow (2.0, *i);
 	}
-	{
-		std::string message = "Considered weights: ";
-		for (auto i: weights)
-		{
-			message += (std::to_string (i) + ' ');
-		}
-		message += '\n';
-		//std::cerr << message;
-	}
 	std::discrete_distribution dist{ weights.begin (), weights.end () };
 	auto selection = dist (random);
 	debug_assert (!weights.empty () && selection < weights.size ());
 	auto result = candidates[selection];
-	std::string message = boost::str (boost::format ("selected index: %1% weight %2% %3%\n") % std::to_string (selection) % std::to_string (weights[selection]) % result.to_account ());
-	//std::cerr << message;
 	accounts.clear ();
 	backoff[result] += 1.0;
 	return result;
@@ -59,8 +48,8 @@ nano::account nano::bootstrap::bootstrap_ascending::backoff_counts::operator() (
 
 void nano::bootstrap::bootstrap_ascending::backoff_counts::erase (nano::account const & account)
 {
-	//backoff.erase (account);
-	backoff [account] = 0;
+	backoff.erase (account);
+	//backoff [account] = 0;
 }
 
 bool nano::bootstrap::bootstrap_ascending::backoff_counts::empty () const
@@ -70,7 +59,7 @@ bool nano::bootstrap::bootstrap_ascending::backoff_counts::empty () const
 
 void nano::bootstrap::bootstrap_ascending::backoff_counts::dump_backoff_hist ()
 {
-	std::vector<size_t> weight_counts;
+	std::deque<size_t> weight_counts;
 	for (auto &[account, count]: backoff)
 	{
 		auto log = std::log2 (std::max<decltype(count)> (count, 1));
@@ -318,28 +307,7 @@ void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx
 
 void nano::bootstrap::bootstrap_ascending::dump_stats ()
 {
-	std::cerr << "Flushing ... "; node->block_processor.flush (); std::cerr << "done\n";
 	node->block_processor.dump_result_hist ();
-	/*{
-		std::lock_guard<std::mutex> lock{ node->block_processor.hist_mutex };
-		std::vector<int> hist;
-		for (auto const &[hash, occurance]: node->block_processor.process_history)
-		{
-			if (hist.size () <= occurance)
-			{
-				hist.resize (occurance + 1);
-			}
-			++hist[occurance];
-		}
-		std::string message = boost::str (boost::format ("Process frequency hist(%1%): ") % hist.size ());
-		auto iterations{ 0 };
-		for (auto i: hist)
-		{
-			message += (std::to_string (i) + ' ');
-		}
-		message += '\n';
-		std::cerr << message;
-	}*/
 	std::lock_guard<nano::mutex> lock{ mutex };
 	backoff.dump_backoff_hist ();
 	std::cerr << boost::str (boost::format ("Requests total: %1% forwarded: %2% source blocked: %3% source iterations: %4% satisfied: %5% responses: %6% accounts: %7%\n") % requests_total.load () % forwarded % source.size () % source_iterations.load () % node->unchecked.satisfied_total.load () % responses.load () % node->ledger.cache.account_count.load ());
