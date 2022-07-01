@@ -43,22 +43,6 @@ private:
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
 
-	class backoff_counts
-	{
-	public:
-		bool insert (nano::account const & account);
-		nano::account operator() ();
-		void erase (nano::account const & account);
-		bool empty () const;
-		void dump_backoff_hist ();
-
-		static size_t constexpr backoff_exclusion = 16;
-	private:
-		std::default_random_engine random;
-		std::unordered_map<nano::account, float> backoff;
-		decltype(backoff) accounts;
-		size_t attempts{ 0 };
-	};
 	class progress_forwarding
 	{
 	public:
@@ -70,16 +54,41 @@ private:
 		std::unordered_set<nano::account> forwarding;
 		bootstrap_ascending & bootstrap;
 	};
-	class source_blocking
+	class account_sets
 	{
+	public: //
+		class source_blocking
+		{
+		public:
+			size_t size () const;
+			bool blocked (nano::account const & account) const;
+			void erase (nano::account const & account);
+			void insert (nano::account const & account);
+		private:
+			static bool constexpr enabled{ true };
+			std::unordered_set<nano::account> accounts;
+		};
+		class backoff_counts
+		{
+		public:
+			bool insert (nano::account const & account);
+			nano::account operator() ();
+			void erase (nano::account const & account);
+			bool empty () const;
+			void dump_backoff_hist ();
+
+			static size_t constexpr backoff_exclusion = 16;
+		private:
+			std::default_random_engine random;
+			std::unordered_map<nano::account, float> backoff;
+			decltype(backoff) accounts;
+			size_t attempts{ 0 };
+		};
 	public:
-		size_t size () const;
-		bool blocked (nano::account const & account) const;
-		void erase (nano::account const & account);
-		void insert (nano::account const & account);
-	private:
-		static bool constexpr enabled{ true };
-		std::unordered_set<nano::account> accounts;
+		//void block (nano::account const & account);
+	//private:
+		backoff_counts backoff;
+		source_blocking source;
 	};
 	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
@@ -102,9 +111,8 @@ private:
 	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);
 	void dump_stats ();
 
-	backoff_counts backoff;
+	account_sets accounts;
 	progress_forwarding forwarding;
-	source_blocking source;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
