@@ -155,6 +155,7 @@ void nano::block_processor::process_blocks ()
 			active = true;
 			lock.unlock ();
 			process_batch (lock);
+			condition.notify_all ();
 			lock.lock ();
 			active = false;
 		}
@@ -341,12 +342,45 @@ void nano::block_processor::process_live (nano::transaction const & transaction_
 	}
 }
 
+void nano::block_processor::dump_result_hist ()
+{
+	std::lock_guard<nano::mutex> lock{ mutex };
+	std::string result;
+	result += "Process result hist: ";
+	for (auto i = 0; i <= static_cast<int> (nano::process_result::insufficient_work); ++i)
+	{
+		auto count = result_hist[static_cast<nano::process_result> (i)];
+		if (count > 0)
+		{
+			result += std::to_string (i);
+			result += ' ';
+			result += std::to_string (count);
+			result += ' ';
+		}
+	}
+	result += '\n';
+	result += boost::str (boost::format ("total: %1%\ngap_source: %2% gap source rate: %3%\ngap_previous: %4% gap previous rate: %5%\n") % processed_count % gap_source_count % (static_cast<double> (gap_source_count) / processed_count) % gap_previous_count % (static_cast<double> (gap_previous_count) / processed_count));
+	std::cerr << result;
+	//result_hist.clear ();
+}
+
 nano::process_return nano::block_processor::process_one (nano::write_transaction const & transaction_a, block_post_events & events_a, nano::unchecked_info info_a, bool const forced_a, nano::block_origin const origin_a)
 {
 	nano::process_return result;
 	auto block (info_a.block);
 	auto hash (block->hash ());
 	result = node.ledger.process (transaction_a, *block, info_a.verified);
+	//std::cerr << "inserting block: " << hash.to_string () << " " << static_cast<int> (result.code) << " on: " << node.network.endpoint () << std::endl;
+	++result_hist[result.code];
+	++processed_count;
+	events_a.events.emplace_back ([this, result, block = info_a.block] (nano::transaction const & tx) {
+		processed.notify (tx, result, *block);
+	});
+	/*{
+		std::lock_guard<std::mutex> lock{ hist_mutex };
+		auto & val = process_history[hash];
+		++val;
+	}*/
 	switch (result.code)
 	{
 		case nano::process_result::progress:
@@ -376,6 +410,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 		}
 		case nano::process_result::gap_previous:
 		{
+			++gap_previous_count;
 			if (node.config.logging.ledger_logging ())
 			{
 				node.logger.try_log (boost::str (boost::format ("Gap previous for: %1%") % hash.to_string ()));
@@ -388,6 +423,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 		}
 		case nano::process_result::gap_source:
 		{
+			++gap_source_count;
 			if (node.config.logging.ledger_logging ())
 			{
 				node.logger.try_log (boost::str (boost::format ("Gap source for: %1%") % hash.to_string ()));
@@ -407,7 +443,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 			info_a.verified = result.verified;
 			node.unchecked.put (block->account (), info_a); // Specific unchecked key starting with epoch open block account public key
 			node.stats.inc (nano::stat::type::ledger, nano::stat::detail::gap_source);
-			break;
+				break;
 		}
 		case nano::process_result::old:
 		{

@@ -764,6 +764,8 @@ public:
 	virtual iterator end () const = 0;
 	virtual size_t count (nano::transaction const &) = 0;
 	virtual void for_each_par (std::function<void (nano::read_transaction const &, iterator, iterator)> const & action_a) const = 0;
+
+	std::atomic<int> dup{ 0 };
 };
 
 /**
@@ -860,7 +862,7 @@ public:
 	static int constexpr version_minimum{ 14 };
 	static int constexpr version_current{ 21 };
 
-private:
+public:
 	unchecked_store & unchecked;
 
 public:
