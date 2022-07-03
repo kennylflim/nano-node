@@ -6,6 +6,35 @@
 
 using namespace std::chrono_literals;
 
+TEST (account_sets, construction)
+{
+	nano::bootstrap::bootstrap_ascending::account_sets sets;
+}
+
+TEST (account_sets, empty_blocked)
+{
+	nano::account account{ 1 };
+	nano::bootstrap::bootstrap_ascending::account_sets sets;
+	ASSERT_FALSE (sets.blocked (account));
+}
+
+TEST (account_sets, block)
+{
+	nano::account account{ 1 };
+	nano::bootstrap::bootstrap_ascending::account_sets sets;
+	sets.block (account);
+	ASSERT_TRUE (sets.blocked (account));
+}
+
+TEST (account_sets, unblock)
+{
+	nano::account account{ 1 };
+	nano::bootstrap::bootstrap_ascending::account_sets sets;
+	sets.block (account);
+	sets.unblock (account);
+	ASSERT_FALSE (sets.blocked (account));
+}
+
 /**
  * Tests basic construction of a bootstrap_ascending attempt
  */
@@ -127,6 +156,6 @@ TEST (bootstrap_ascending, trace_base)
 	ASSERT_EQ (node1.store.pending.begin (node1.store.tx_begin_read (), nano::pending_key{ key.pub, 0 }), node1.store.pending.end ());
 	std::cerr << "node0: " << node0.network.endpoint () << std::endl;
 	std::cerr << "node1: " << node1.network.endpoint () << std::endl;
-	ASSERT_TIMELY (50s, node1.block (receive1->hash ()) != nullptr);
+	ASSERT_TIMELY (10s, node1.block (receive1->hash ()) != nullptr);
 }
 

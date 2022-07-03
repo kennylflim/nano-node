@@ -43,52 +43,26 @@ private:
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
 
-	class progress_forwarding
-	{
-	public:
-		progress_forwarding (bootstrap_ascending & bootstrap);
-		std::optional<nano::account> operator() ();
-		void insert (nano::account const & account);
-	private:
-		static bool constexpr enabled{ true };
-		std::unordered_set<nano::account> forwarding;
-		bootstrap_ascending & bootstrap;
-	};
+public:
 	class account_sets
 	{
-	public: //
-		class source_blocking
-		{
-		public:
-			size_t size () const;
-			bool blocked (nano::account const & account) const;
-			void erase (nano::account const & account);
-			void insert (nano::account const & account);
-		private:
-			static bool constexpr enabled{ true };
-			std::unordered_set<nano::account> accounts;
-		};
-		class backoff_counts
-		{
-		public:
-			bool insert (nano::account const & account);
-			nano::account operator() ();
-			void erase (nano::account const & account);
-			bool empty () const;
-			void dump_backoff_hist ();
-
-			static size_t constexpr backoff_exclusion = 16;
-		private:
-			std::default_random_engine random;
-			std::unordered_map<nano::account, float> backoff;
-			decltype(backoff) accounts;
-			size_t attempts{ 0 };
-		};
 	public:
-		//void block (nano::account const & account);
-	//private:
-		backoff_counts backoff;
-		source_blocking source;
+		account_sets ();
+		void forward (nano::account const & account);
+		void block (nano::account const & account);
+		void unblock (nano::account const & account);
+		void dump () const;
+		nano::account next ();
+
+	public:
+		bool blocked (nano::account const & account) const;
+	private:
+		nano::account random ();
+		std::unordered_set<nano::account> forwarding;
+		std::unordered_set<nano::account> blocking;
+		std::map<nano::account, float> backoff;
+		static size_t constexpr backoff_exclusion = 16;
+		std::default_random_engine rng;
 	};
 	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
@@ -103,16 +77,12 @@ private:
 	void request_one ();
 	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
 	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
-	nano::account random_account_entry (nano::transaction const & tx, nano::account const & search);
-	std::optional<nano::account> random_pending_entry (nano::transaction const & tx, nano::account const & search);
-	std::optional<nano::account> random_ledger_account (nano::transaction const & tx);
-	std::optional<nano::account> pick_account ();
+	nano::account pick_account ();
 	bool blocked (nano::account const & account);
 	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);
 	void dump_stats ();
 
 	account_sets accounts;
-	progress_forwarding forwarding;
 	std::deque<socket_channel> sockets;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
