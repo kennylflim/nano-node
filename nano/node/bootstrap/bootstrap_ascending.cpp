@@ -8,6 +8,50 @@
 
 using namespace std::chrono_literals;
 
+nano::bootstrap::bootstrap_ascending::connection_pool::connection_pool (nano::node & node) :
+	node{ node }
+{
+}
+
+void nano::bootstrap::bootstrap_ascending::connection_pool::operator () (socket_channel const & connection)
+{
+	connections.push_back (connection);
+}
+
+bool nano::bootstrap::bootstrap_ascending::connection_pool::operator () (std::shared_ptr<async_tag> tag, std::function<void()> op)
+{
+	if (!connections.empty ())
+	{
+		tag->connection_set (connections.front ());
+		connections.pop_front ();
+		op ();
+		return false;
+	}
+	auto endpoint = node.network.bootstrap_peer (true);
+	if (endpoint != nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
+	{
+		auto socket = std::make_shared<nano::client_socket> (node);
+		auto channel = std::make_shared<nano::transport::channel_tcp> (node, socket);
+		tag->connection_set (std::make_pair (socket, channel));
+		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
+		socket->async_connect (endpoint,
+		[endpoint, op] (boost::system::error_code const & ec) {
+			if (ec)
+			{
+				std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
+				return;
+			}
+			std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
+			op ();
+		});
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
 nano::bootstrap::bootstrap_ascending::account_sets::account_sets ()
 {
 }
@@ -126,7 +170,7 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 	if (success_m)
 	{
 		debug_assert (connection_m);
-		bootstrap->sockets.push_back (*connection_m);
+		bootstrap->pool (*connection_m);
 	}
 	bootstrap->condition.notify_all ();
 	//std::cerr << boost::str (boost::format ("Request completed\n"));
@@ -134,6 +178,7 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 
 void nano::bootstrap::bootstrap_ascending::async_tag::success ()
 {
+	debug_assert (connection_m);
 	success_m = true;
 }
 
@@ -245,7 +290,8 @@ bool nano::bootstrap::bootstrap_ascending::wait_available_request ()
 }
 
 nano::bootstrap::bootstrap_ascending::bootstrap_ascending (std::shared_ptr<nano::node> const & node_a, uint64_t incremental_id_a, std::string id_a) :
-	bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id_a }
+	bootstrap_attempt{ node_a, nano::bootstrap_mode::ascending, incremental_id_a, id_a },
+	pool{ *node }
 {
 	auto tx = node_a->store.tx_begin_read ();
 	for (auto i = node_a->store.account.begin (tx), n = node_a->store.account.end (); i != n; ++i)
@@ -274,33 +320,11 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 		start = info.head;
 	}
 	std::unique_lock<nano::mutex> lock{ mutex };
-	if (!sockets.empty ())
-	{
-		tag->connection_set (sockets.front ());
-		sockets.pop_front ();
-		send (tag, start);
-		return;
-	}
+	auto error = pool (tag, [this_l = shared (), start, tag] () {
+		this_l->send (tag, start);
+	});
 	lock.unlock ();
-	auto endpoint = node->network.bootstrap_peer (true);
-	if (endpoint != nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
-	{
-		auto socket = std::make_shared<nano::client_socket> (*node);
-		auto channel = std::make_shared<nano::transport::channel_tcp> (*node, socket);
-		tag->connection_set (std::make_pair (socket, channel));
-		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
-		socket->async_connect (endpoint,
-		[this_l = shared (), endpoint, tag, start] (boost::system::error_code const & ec) {
-			if (ec)
-			{
-				std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
-				return;
-			}
-			std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
-			this_l->send (tag, start);
-		});
-	}
-	else
+	if (error)
 	{
 		stop ();
 	}

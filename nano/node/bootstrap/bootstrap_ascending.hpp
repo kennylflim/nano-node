@@ -39,11 +39,24 @@ public:
 		std::cerr << '\0';
 	}
 private:
-	using socket_channel = std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>;
 	std::shared_ptr<nano::bootstrap::bootstrap_ascending> shared ();
 	//void dump_miss_histogram ();
 
 public:
+	class async_tag;
+	class connection_pool
+	{
+	public:
+		using socket_channel = std::pair<std::shared_ptr<nano::socket>, std::shared_ptr<nano::transport::channel>>;
+	public:
+		connection_pool (nano::node & node);
+		bool operator () (std::shared_ptr<async_tag> tag, std::function<void()> op);
+		void operator () (socket_channel const & connection);
+	private:
+		nano::node & node;
+		std::deque<socket_channel> connections;
+	};
+	using socket_channel = connection_pool::socket_channel;
 	class account_sets
 	{
 	public:
@@ -74,6 +87,7 @@ public:
 		socket_channel & connection ();
 
 		std::atomic<int> blocks{ 0 };
+		std::optional<socket_channel> requeue;
 	private:
 		bool success_m{ false };
 		std::optional<socket_channel> connection_m;
@@ -88,7 +102,7 @@ public:
 	void dump_stats ();
 
 	account_sets accounts;
-	std::deque<socket_channel> sockets;
+	connection_pool pool;
 	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
 	std::atomic<int> responses{ 0 };
