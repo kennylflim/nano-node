@@ -69,14 +69,19 @@ public:
 	public:
 		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap);
 		~async_tag ();
+		void success ();
+		void connection_set (socket_channel const & connection);
+		socket_channel & connection ();
 
 		std::atomic<int> blocks{ 0 };
 	private:
+		bool success_m{ false };
+		std::optional<socket_channel> connection_m;
 		std::shared_ptr<bootstrap_ascending> bootstrap;
 	};
 	void request_one ();
-	void send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start);
-	void read_block (std::shared_ptr<async_tag> tag, socket_channel ctx);
+	void send (std::shared_ptr<async_tag> tag, nano::hash_or_account const & start);
+	void read_block (std::shared_ptr<async_tag> tag);
 	nano::account pick_account ();
 	bool blocked (nano::account const & account);
 	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);

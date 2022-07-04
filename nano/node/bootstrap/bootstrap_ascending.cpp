@@ -123,11 +123,32 @@ nano::bootstrap::bootstrap_ascending::async_tag::~async_tag ()
 	{
 		++bootstrap->responses;
 	}
+	if (success_m)
+	{
+		debug_assert (connection_m);
+		bootstrap->sockets.push_back (*connection_m);
+	}
 	bootstrap->condition.notify_all ();
 	//std::cerr << boost::str (boost::format ("Request completed\n"));
 }
 
-void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag, socket_channel ctx, nano::hash_or_account const & start)
+void nano::bootstrap::bootstrap_ascending::async_tag::success ()
+{
+	success_m = true;
+}
+
+void nano::bootstrap::bootstrap_ascending::async_tag::connection_set (socket_channel const & connection)
+{
+	connection_m = connection;
+}
+
+auto nano::bootstrap::bootstrap_ascending::async_tag::connection () -> socket_channel &
+{
+	debug_assert (connection_m);
+	return *connection_m;
+}
+
+void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag, nano::hash_or_account const & start)
 {
 	nano::bulk_pull message{ node->network_params.network };
 	message.header.flag_set (nano::message_header::bulk_pull_ascending_flag);
@@ -136,28 +157,27 @@ void nano::bootstrap::bootstrap_ascending::send (std::shared_ptr<async_tag> tag,
 	message.end = 0;
 	message.count = request_message_count;
 	//std::cerr << boost::str (boost::format ("Request sent for: %1% to: %2%\n") % message.start.to_string () % ctx.first->remote_endpoint ());
-	auto channel = ctx.second;
+	auto channel = tag->connection ().second;
 	++requests_total;
-	channel->send (message, [this_l = shared (), tag, ctx] (boost::system::error_code const & ec, std::size_t size) {
-		this_l->read_block (tag, ctx);
+	channel->send (message, [this_l = shared (), tag] (boost::system::error_code const & ec, std::size_t size) {
+		this_l->read_block (tag);
 	});
 }
 
-void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag> tag, socket_channel ctx)
+void nano::bootstrap::bootstrap_ascending::read_block (std::shared_ptr<async_tag> tag)
 {
 	auto deserializer = std::make_shared<nano::bootstrap::block_deserializer>();
-	auto socket = ctx.first;
-	deserializer->read (*socket, [this_l = shared (), tag, ctx] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
+	auto socket = tag->connection ().first;
+	deserializer->read (*socket, [this_l = shared (), tag] (boost::system::error_code ec, std::shared_ptr<nano::block> block) {
 		if (block == nullptr)
 		{
 			//std::cerr << "stream end\n";
-			std::lock_guard<nano::mutex> lock{ this_l->mutex };
-			this_l->sockets.push_back (ctx);
+			tag->success ();
 			return;
 		}
 		//std::cerr << boost::str (boost::format ("block: %1%\n") % block->hash ().to_string ());
 		this_l->node->block_processor.add (block);
-		this_l->read_block (tag, ctx);
+		this_l->read_block (tag);
 		++tag->blocks;
 	});
 }
@@ -256,9 +276,9 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	std::unique_lock<nano::mutex> lock{ mutex };
 	if (!sockets.empty ())
 	{
-		auto socket = sockets.front ();
+		tag->connection_set (sockets.front ());
 		sockets.pop_front ();
-		send (tag, socket, start);
+		send (tag, start);
 		return;
 	}
 	lock.unlock ();
@@ -267,16 +287,17 @@ void nano::bootstrap::bootstrap_ascending::request_one ()
 	{
 		auto socket = std::make_shared<nano::client_socket> (*node);
 		auto channel = std::make_shared<nano::transport::channel_tcp> (*node, socket);
+		tag->connection_set (std::make_pair (socket, channel));
 		std::cerr << boost::str (boost::format ("Connecting: %1%\n") % endpoint);
 		socket->async_connect (endpoint,
-		[this_l = shared (), endpoint, tag, ctx = std::make_pair (socket, channel), start] (boost::system::error_code const & ec) {
+		[this_l = shared (), endpoint, tag, start] (boost::system::error_code const & ec) {
 			if (ec)
 			{
 				std::cerr << boost::str (boost::format ("connect failed to: %1%\n") % endpoint);
 				return;
 			}
 			std::cerr << boost::str (boost::format ("connected to: %1%\n") % endpoint);
-			this_l->send (tag, ctx, start);
+			this_l->send (tag, start);
 		});
 	}
 	else
