@@ -61,7 +61,7 @@ public:
 	{
 	public:
 		account_sets ();
-		void forward (nano::account const & account);
+		void prioritize (nano::account const & account, float priority);
 		void block (nano::account const & account);
 		void unblock (nano::account const & account);
 		void dump () const;
@@ -74,7 +74,7 @@ public:
 		std::unordered_set<nano::account> forwarding;
 		std::unordered_set<nano::account> blocking;
 		std::map<nano::account, float> backoff;
-		static size_t constexpr backoff_exclusion = 16;
+		static size_t constexpr backoff_exclusion = 4;
 		std::default_random_engine rng;
 	};
 	class thread : public std::enable_shared_from_this<thread>
@@ -119,7 +119,8 @@ public:
 
 	account_sets accounts;
 	connection_pool pool;
-	static size_t constexpr request_message_count = 16;
+	static std::size_t constexpr parallelism = 2;
+	static std::size_t constexpr request_message_count = 16;
 	std::atomic<int> responses{ 0 };
 	std::atomic<int> requests_total{ 0 };
 	std::atomic<int> source_iterations{ 0 };

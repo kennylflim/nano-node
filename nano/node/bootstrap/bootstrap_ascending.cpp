@@ -81,11 +81,16 @@ void nano::bootstrap::bootstrap_ascending::account_sets::dump () const
 	std::cerr << output;
 }
 
-void nano::bootstrap::bootstrap_ascending::account_sets::forward (nano::account const & account)
+void nano::bootstrap::bootstrap_ascending::account_sets::prioritize (nano::account const & account, float priority)
 {
 	if (blocking.count (account) == 0)
 	{
 		forwarding.insert (account);
+		auto iter = backoff.find (account);
+		if (iter == backoff.end ())
+		{
+			backoff.emplace (account, priority);
+		}
 	}
 }
 
@@ -99,7 +104,7 @@ void nano::bootstrap::bootstrap_ascending::account_sets::block (nano::account co
 void nano::bootstrap::bootstrap_ascending::account_sets::unblock (nano::account const & account)
 {
 	blocking.erase (account);
-	backoff.emplace (account, 0.0f);
+	backoff[account] = 0.0f;
 }
 
 nano::account nano::bootstrap::bootstrap_ascending::account_sets::random ()
@@ -123,13 +128,13 @@ nano::account nano::bootstrap::bootstrap_ascending::account_sets::random ()
 	}
 	for (auto i = weights.begin (), n = weights.end (); i != n; ++i)
 	{
-		*i = 1.0 / std::pow (2.0, *i);
+		*i = 1.0f / std::pow (2.0f, *i);
 	}
 	std::discrete_distribution dist{ weights.begin (), weights.end () };
 	auto selection = dist (rng);
 	debug_assert (!weights.empty () && selection < weights.size ());
 	auto result = candidates[selection];
-	backoff[result] += 1.0;
+	backoff[result] += 1.0f;
 	return result;
 }
 
@@ -240,23 +245,25 @@ nano::account nano::bootstrap::bootstrap_ascending::thread::pick_account ()
 
 void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block)
 {
-	std::lock_guard<nano::mutex> lock{ mutex };
 	switch (result.code)
 	{
 		case nano::process_result::progress:
 		{
 			auto account = node->ledger.account (tx, block.hash ());
+			auto is_send = node->ledger.is_send (tx, block);
+			std::lock_guard<nano::mutex> lock{ mutex };
 			accounts.unblock (account);
-			accounts.forward (account);
-			if (node->ledger.is_send (tx, block))
+			accounts.prioritize (account, 0.0f);
+			if (is_send)
 			{
+				auto const send_factor = 1.0f;
 				switch (block.type ())
 				{
 					case nano::block_type::send:
-						accounts.forward (block.destination ());
+						accounts.prioritize (block.destination (), send_factor);
 						break;
 					case nano::block_type::state:
-						accounts.forward (block.link ().as_account ());
+						accounts.prioritize (block.link ().as_account (), send_factor);
 						break;
 					default:
 						debug_assert (false);
@@ -268,6 +275,7 @@ void nano::bootstrap::bootstrap_ascending::inspect (nano::transaction const & tx
 		case nano::process_result::gap_source:
 		{
 			auto account = block.previous ().is_zero () ? block.account () : node->ledger.account (tx, block.previous ());
+			std::lock_guard<nano::mutex> lock{ mutex };
 			accounts.block (account);
 			break;
 		}
@@ -301,11 +309,11 @@ nano::bootstrap::bootstrap_ascending::bootstrap_ascending (std::shared_ptr<nano:
 	auto tx = node_a->store.tx_begin_read ();
 	for (auto i = node_a->store.account.begin (tx), n = node_a->store.account.end (); i != n; ++i)
 	{
-		accounts.unblock (i->first);
+		accounts.prioritize (i->first, 0.0f);
 	}
 	for (auto i = node_a->store.pending.begin (tx), n = node_a->store.pending.end (); i != n; ++i)
 	{
-		accounts.unblock (i->first.key ());
+		accounts.prioritize (i->first.key (), 0.0f);
 	}
 }
 
@@ -365,7 +373,7 @@ void nano::bootstrap::bootstrap_ascending::run ()
 		this_l->inspect (tx, result, block);
 	});
 	std::deque<std::future<void>> futures;
-	for (auto i = 0; i < 2; ++i)
+	for (auto i = 0; i < parallelism; ++i)
 	{
 		futures.emplace_back (std::async (std::launch::async, [this_l = shared ()] () {
 			auto thread = std::make_shared<bootstrap_ascending::thread> (this_l);
