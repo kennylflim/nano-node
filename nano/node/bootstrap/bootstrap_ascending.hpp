@@ -77,10 +77,29 @@ public:
 		static size_t constexpr backoff_exclusion = 16;
 		std::default_random_engine rng;
 	};
+	class thread : public std::enable_shared_from_this<thread>
+	{
+	public:
+		thread (std::shared_ptr<bootstrap_ascending> bootstrap);
+		/// Wait for there to be space for an additional request
+		bool wait_available_request ();
+		void request_one ();
+		void run ();
+		std::shared_ptr<thread> shared ();
+		nano::account pick_account ();
+		void send (std::shared_ptr<async_tag> tag, nano::hash_or_account const & start);
+		void read_block (std::shared_ptr<async_tag> tag);
+	
+		std::atomic<int> requests{ 0 };
+		static constexpr int requests_max = 1;
+	public://private: // Convinience reference rather than internally using a pointer
+		std::shared_ptr<bootstrap_ascending> bootstrap_ptr;
+		bootstrap_ascending & bootstrap{ *bootstrap_ptr };
+	};
 	class async_tag : public std::enable_shared_from_this<async_tag>
 	{
 	public:
-		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending> bootstrap);
+		async_tag (std::shared_ptr<nano::bootstrap::bootstrap_ascending::thread> bootstrap);
 		~async_tag ();
 		void success ();
 		void connection_set (socket_channel const & connection);
@@ -91,29 +110,22 @@ public:
 	private:
 		bool success_m{ false };
 		std::optional<socket_channel> connection_m;
-		std::shared_ptr<bootstrap_ascending> bootstrap;
+		std::shared_ptr<bootstrap_ascending::thread> bootstrap;
 	};
 	void request_one ();
-	void send (std::shared_ptr<async_tag> tag, nano::hash_or_account const & start);
-	void read_block (std::shared_ptr<async_tag> tag);
-	nano::account pick_account ();
 	bool blocked (nano::account const & account);
 	void inspect (nano::transaction const & tx, nano::process_return const & result, nano::block const & block);
 	void dump_stats ();
 
 	account_sets accounts;
 	connection_pool pool;
-	static constexpr int requests_max = 1;
 	static size_t constexpr request_message_count = 16;
 	std::atomic<int> responses{ 0 };
-	std::atomic<int> requests{ 0 };
 	std::atomic<int> requests_total{ 0 };
 	std::atomic<int> source_iterations{ 0 };
 	std::atomic<float> weights{ 0 };
 	std::atomic<int> forwarded{ 0 };
 	std::atomic<int> block_total{ 0 };
-	/// Wait for there to be space for an additional request
-	bool wait_available_request ();
 };
 }
 }
