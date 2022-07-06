@@ -134,20 +134,24 @@ nano::account nano::bootstrap::bootstrap_ascending::account_sets::random ()
 	auto selection = dist (rng);
 	debug_assert (!weights.empty () && selection < weights.size ());
 	auto result = candidates[selection];
-	backoff[result] += 1.0f;
 	return result;
 }
 
 nano::account nano::bootstrap::bootstrap_ascending::account_sets::next ()
 {
+	nano::account result;
 	if (!forwarding.empty ())
 	{
 		auto iter = forwarding.begin ();
-		auto result = *iter;
+		result = *iter;
 		forwarding.erase (iter);
-		return result;
 	}
-	return random ();
+	else
+	{
+		result = random ();
+	}
+	backoff[result] += 1.0f;
+	return result;
 }
 
 bool nano::bootstrap::bootstrap_ascending::account_sets::blocked (nano::account const & account) const
