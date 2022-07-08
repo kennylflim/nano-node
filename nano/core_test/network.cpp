@@ -220,7 +220,14 @@ TEST (network, send_discarded_publish)
 	nano::system system (2);
 	auto & node1 (*system.nodes[0]);
 	auto & node2 (*system.nodes[1]);
-	auto block (std::make_shared<nano::send_block> (1, 1, 2, nano::keypair ().prv, 4, *system.work.generate (nano::root (1))));
+	auto block = builder
+				 .send ()
+				 .previous (1)
+				 .destination (1)
+				 .balance (2)
+				 .sign (nano::keypair ().prv, 4)
+				 .work (*system.work.generate (nano::root (1)))
+				 .build_shared ()
 	{
 		auto transaction (node1.store.tx_begin_read ());
 		node1.network.flood_block (block);
@@ -238,7 +245,14 @@ TEST (network, send_invalid_publish)
 	nano::system system (2);
 	auto & node1 (*system.nodes[0]);
 	auto & node2 (*system.nodes[1]);
-	auto block (std::make_shared<nano::send_block> (1, 1, 20, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (nano::root (1))));
+	auto block = builder
+				 .send ()
+				 .previous (1)
+				 .destination (1)
+				 .balance (20)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (nano::root (1)))
+				 .build_shared ()
 	{
 		auto transaction (node1.store.tx_begin_read ());
 		node1.network.flood_block (block);
@@ -270,8 +284,15 @@ TEST (network, send_valid_confirm_ack)
 		system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 		system.wallet (1)->insert_adhoc (key2.prv);
 		nano::block_hash latest1 (node1.latest (nano::dev::genesis_key.pub));
-		nano::send_block block2 (latest1, key2.pub, 50, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (latest1));
-		nano::block_hash latest2 (node2.latest (nano::dev::genesis_key.pub));
+		auto block2 = builder
+					  .send ()
+					  .previous (latest1)
+					  .destination (key2.pub)
+					  .balance (50)
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*system.work.generate (latest1))
+					  .build ()
+					  nano::block_hash latest2 (node2.latest (nano::dev::genesis_key.pub));
 		node1.process_active (std::make_shared<nano::send_block> (block2));
 		// Keep polling until latest block changes
 		ASSERT_TIMELY (10s, node2.latest (nano::dev::genesis_key.pub) != latest2);
@@ -301,8 +322,14 @@ TEST (network, send_valid_publish)
 		nano::keypair key2;
 		system.wallet (1)->insert_adhoc (key2.prv);
 		nano::block_hash latest1 (node1.latest (nano::dev::genesis_key.pub));
-		nano::send_block block2 (latest1, key2.pub, 50, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (latest1));
-		auto hash2 (block2.hash ());
+		auto block2 = builder
+					  .send ()
+					  .previous (latest1)
+					  .destination (key2.pub)
+					  .balance (50)
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*system.work.generate (latest1))
+					  .build () auto hash2 (block2.hash ());
 		nano::block_hash latest2 (node2.latest (nano::dev::genesis_key.pub));
 		node2.process_active (std::make_shared<nano::send_block> (block2));
 		ASSERT_TIMELY (10s, node1.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::in) != 0);
@@ -319,8 +346,15 @@ TEST (network, send_insufficient_work_udp)
 	node_flags.disable_udp = false;
 	auto & node1 = *system.add_node (node_flags);
 	auto & node2 = *system.add_node (node_flags);
-	auto block (std::make_shared<nano::send_block> (0, 1, 20, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0));
-	nano::publish publish{ nano::dev::network_params.network, block };
+	auto block = builder
+				 .send ()
+				 .previous (0)
+				 .destination (1)
+				 .balance (20)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (0)
+				 .build_shared ()
+				 nano::publish publish{ nano::dev::network_params.network, block };
 	nano::transport::channel_udp channel (node1.network.udp_channels, node2.network.endpoint (), node1.network_params.network.protocol_version);
 	channel.send (publish, [] (boost::system::error_code const & ec, size_t size) {});
 	ASSERT_EQ (0, node1.stats.count (nano::stat::type::error, nano::stat::detail::insufficient_work));
@@ -334,8 +368,15 @@ TEST (network, send_insufficient_work)
 	auto & node1 = *system.nodes[0];
 	auto & node2 = *system.nodes[1];
 	// Block zero work
-	auto block1 (std::make_shared<nano::send_block> (0, 1, 20, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0));
-	nano::publish publish1{ nano::dev::network_params.network, block1 };
+	auto block1 = builder
+				  .send ()
+				  .previous (0)
+				  .destination (1)
+				  .balance (20)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ()
+				  nano::publish publish1{ nano::dev::network_params.network, block1 };
 	auto tcp_channel (node1.network.tcp_channels.find_channel (nano::transport::map_endpoint_to_tcp (node2.network.endpoint ())));
 	tcp_channel->send (publish1, [] (boost::system::error_code const & ec, size_t size) {});
 	ASSERT_EQ (0, node1.stats.count (nano::stat::type::error, nano::stat::detail::insufficient_work));
@@ -367,8 +408,15 @@ TEST (receivable_processor, confirm_insufficient_pos)
 {
 	nano::system system (1);
 	auto & node1 (*system.nodes[0]);
-	auto block1 (std::make_shared<nano::send_block> (nano::dev::genesis->hash (), 0, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0));
-	node1.work_generate_blocking (*block1);
+	auto block1 = builder
+				  .send ()
+				  .previous (nano::dev::genesis->hash ())
+				  .destination (0)
+				  .balance (0)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ()
+				  node1.work_generate_blocking (*block1);
 	ASSERT_EQ (nano::process_result::progress, node1.process (*block1).code);
 	node1.scheduler.activate (nano::dev::genesis_key.pub, node1.store.tx_begin_read ());
 	nano::keypair key1;
@@ -381,8 +429,15 @@ TEST (receivable_processor, confirm_sufficient_pos)
 {
 	nano::system system (1);
 	auto & node1 (*system.nodes[0]);
-	auto block1 (std::make_shared<nano::send_block> (nano::dev::genesis->hash (), 0, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0));
-	node1.work_generate_blocking (*block1);
+	auto block1 = builder
+				  .send ()
+				  .previous (nano::dev::genesis->hash ())
+				  .destination (0)
+				  .balance (0)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (0)
+				  .build_shared ()
+				  node1.work_generate_blocking (*block1);
 	ASSERT_EQ (nano::process_result::progress, node1.process (*block1).code);
 	node1.scheduler.activate (nano::dev::genesis_key.pub, node1.store.tx_begin_read ());
 	auto vote (std::make_shared<nano::vote> (nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, 0, 0, std::vector<nano::block_hash>{ block1->hash () }));
@@ -410,8 +465,15 @@ TEST (receivable_processor, send_with_receive)
 		system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 		nano::block_hash latest1 (node1.latest (nano::dev::genesis_key.pub));
 		system.wallet (1)->insert_adhoc (key2.prv);
-		auto block1 (std::make_shared<nano::send_block> (latest1, key2.pub, amount - node1.config.receive_minimum.number (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (latest1)));
-		ASSERT_EQ (amount, node1.balance (nano::dev::genesis_key.pub));
+		auto block1 = builder
+					  .send ()
+					  .previous (latest1)
+					  .destination (key2.pub)
+					  .balance (amount - node1.config.receive_minimum.number ())
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*system.work.generate (latest1))
+					  .build_shared ()
+					  ASSERT_EQ (amount, node1.balance (nano::dev::genesis_key.pub));
 		ASSERT_EQ (0, node1.balance (key2.pub));
 		ASSERT_EQ (amount, node2.balance (nano::dev::genesis_key.pub));
 		ASSERT_EQ (0, node2.balance (key2.pub));

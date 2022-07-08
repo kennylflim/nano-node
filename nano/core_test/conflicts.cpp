@@ -13,8 +13,15 @@ TEST (conflicts, start_stop)
 	nano::system system (1);
 	auto & node1 (*system.nodes[0]);
 	nano::keypair key1;
-	auto send1 (std::make_shared<nano::send_block> (nano::dev::genesis->hash (), key1.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0));
-	node1.work_generate_blocking (*send1);
+	auto send1 = builder
+				 .send ()
+				 .previous (nano::dev::genesis->hash ())
+				 .destination (key1.pub)
+				 .balance (0)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (0)
+				 .build_shared ()
+				 node1.work_generate_blocking (*send1);
 	ASSERT_EQ (nano::process_result::progress, node1.process (*send1).code);
 	ASSERT_EQ (0, node1.active.size ());
 	node1.scheduler.activate (nano::dev::genesis_key.pub, node1.store.tx_begin_read ());
@@ -30,13 +37,27 @@ TEST (conflicts, add_existing)
 	nano::system system{ 1 };
 	auto & node1 = *system.nodes[0];
 	nano::keypair key1;
-	auto send1 = std::make_shared<nano::send_block> (nano::dev::genesis->hash (), key1.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0);
-	node1.work_generate_blocking (*send1);
+	auto send1 = builder
+				 .send ()
+				 .previous (nano::dev::genesis->hash ())
+				 .destination (key1.pub)
+				 .balance (0)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (0)
+				 .build_shared ()
+				 node1.work_generate_blocking (*send1);
 	ASSERT_EQ (nano::process_result::progress, node1.process (*send1).code);
 	node1.scheduler.activate (nano::dev::genesis_key.pub, node1.store.tx_begin_read ());
 	nano::keypair key2;
-	auto send2 = std::make_shared<nano::send_block> (nano::dev::genesis->hash (), key2.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0);
-	node1.work_generate_blocking (*send2);
+	auto send2 = builder
+				 .send ()
+				 .previous (nano::dev::genesis->hash ())
+				 .destination (key2.pub)
+				 .balance (0)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (0)
+				 .build_shared ()
+				 node1.work_generate_blocking (*send2);
 	send2->sideband_set ({});
 	node1.block_processor.add (send2);
 	ASSERT_TIMELY (5s, node1.active.active (*send2));
@@ -146,8 +167,18 @@ TEST (vote_uniquer, vbh_one)
 	nano::block_uniquer block_uniquer;
 	nano::vote_uniquer uniquer (block_uniquer);
 	nano::keypair key;
-	auto block (std::make_shared<nano::state_block> (0, 0, 0, 0, 0, key.prv, key.pub, 0));
-	std::vector<nano::block_hash> hashes;
+	auto block = builder
+				 .state ()
+				 .account (0)
+				 .previous (0)
+				 .representative (0)
+				 .balance (0)
+				 .link (0)
+				 .sign (key.prv, key.pub)
+				 .work (0)
+				 .build_shared ()
+				 std::vector<nano::block_hash>
+				 hashes;
 	hashes.push_back (block->hash ());
 	auto vote1 (std::make_shared<nano::vote> (key.pub, key.prv, 0, 0, hashes));
 	auto vote2 (std::make_shared<nano::vote> (*vote1));
@@ -160,11 +191,31 @@ TEST (vote_uniquer, vbh_two)
 	nano::block_uniquer block_uniquer;
 	nano::vote_uniquer uniquer (block_uniquer);
 	nano::keypair key;
-	auto block1 (std::make_shared<nano::state_block> (0, 0, 0, 0, 0, key.prv, key.pub, 0));
-	std::vector<nano::block_hash> hashes1;
+	auto block1 = builder
+				  .state ()
+				  .account (0)
+				  .previous (0)
+				  .representative (0)
+				  .balance (0)
+				  .link (0)
+				  .sign (key.prv, key.pub)
+				  .work (0)
+				  .build_shared ()
+				  std::vector<nano::block_hash>
+				  hashes1;
 	hashes1.push_back (block1->hash ());
-	auto block2 (std::make_shared<nano::state_block> (1, 0, 0, 0, 0, key.prv, key.pub, 0));
-	std::vector<nano::block_hash> hashes2;
+	auto block2 = builder
+				  .state ()
+				  .account (1)
+				  .previous (0)
+				  .representative (0)
+				  .balance (0)
+				  .link (0)
+				  .sign (key.prv, key.pub)
+				  .work (0)
+				  .build_shared ()
+				  std::vector<nano::block_hash>
+				  hashes2;
 	hashes2.push_back (block2->hash ());
 	auto vote1 (std::make_shared<nano::vote> (key.pub, key.prv, 0, 0, hashes1));
 	auto vote2 (std::make_shared<nano::vote> (key.pub, key.prv, 0, 0, hashes2));

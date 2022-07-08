@@ -116,8 +116,15 @@ TEST (block_store, add_item)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::open_block block (0, 1, 0, nano::keypair ().prv, 0, 0);
-	block.sideband_set ({});
+	auto block = builder
+				 .open ()
+				 .source (0)
+				 .representative (1)
+				 .account (0)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (0)
+				 .build ()
+				 block.sideband_set ({});
 	auto hash1 (block.hash ());
 	auto transaction (store->tx_begin_write ());
 	auto latest1 (store->block.get (transaction, hash1));
@@ -139,12 +146,26 @@ TEST (block_store, clear_successor)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::open_block block1 (0, 1, 0, nano::keypair ().prv, 0, 0);
-	block1.sideband_set ({});
+	auto block1 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (0)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block1.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, block1.hash (), block1);
-	nano::open_block block2 (0, 2, 0, nano::keypair ().prv, 0, 0);
-	block2.sideband_set ({});
+	auto block2 = builder
+				  .open ()
+				  .source (0)
+				  .representative (2)
+				  .account (0)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block2.sideband_set ({});
 	store->block.put (transaction, block2.hash (), block2);
 	auto block2_store (store->block.get (transaction, block1.hash ()));
 	ASSERT_NE (nullptr, block2_store);
@@ -172,8 +193,15 @@ TEST (block_store, add_nonempty_block)
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
 	nano::keypair key1;
-	nano::open_block block (0, 1, 0, nano::keypair ().prv, 0, 0);
-	block.sideband_set ({});
+	auto block = builder
+				 .open ()
+				 .source (0)
+				 .representative (1)
+				 .account (0)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (0)
+				 .build ()
+				 block.sideband_set ({});
 	auto hash1 (block.hash ());
 	block.signature = nano::sign_message (key1.prv, key1.pub, hash1);
 	auto transaction (store->tx_begin_write ());
@@ -191,15 +219,29 @@ TEST (block_store, add_two_items)
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
 	nano::keypair key1;
-	nano::open_block block (0, 1, 1, nano::keypair ().prv, 0, 0);
-	block.sideband_set ({});
+	auto block = builder
+				 .open ()
+				 .source (0)
+				 .representative (1)
+				 .account (1)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (0)
+				 .build ()
+				 block.sideband_set ({});
 	auto hash1 (block.hash ());
 	block.signature = nano::sign_message (key1.prv, key1.pub, hash1);
 	auto transaction (store->tx_begin_write ());
 	auto latest1 (store->block.get (transaction, hash1));
 	ASSERT_EQ (nullptr, latest1);
-	nano::open_block block2 (0, 1, 3, nano::keypair ().prv, 0, 0);
-	block2.sideband_set ({});
+	auto block2 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (3)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block2.sideband_set ({});
 	block2.hashables.account = 3;
 	auto hash2 (block2.hash ());
 	block2.signature = nano::sign_message (key1.prv, key1.pub, hash2);
@@ -223,12 +265,25 @@ TEST (block_store, add_receive)
 	ASSERT_TRUE (!store->init_error ());
 	nano::keypair key1;
 	nano::keypair key2;
-	nano::open_block block1 (0, 1, 0, nano::keypair ().prv, 0, 0);
-	block1.sideband_set ({});
+	auto block1 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (0)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block1.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, block1.hash (), block1);
-	nano::receive_block block (block1.hash (), 1, nano::keypair ().prv, 2, 3);
-	block.sideband_set ({});
+	auto block = builder
+				 .receive ()
+				 .previous (block1.hash ())
+				 .source (1)
+				 .sign (nano::keypair ().prv, 2)
+				 .work (3)
+				 .build ()
+				 block.sideband_set ({});
 	nano::block_hash hash1 (block.hash ());
 	auto latest1 (store->block.get (transaction, hash1));
 	ASSERT_EQ (nullptr, latest1);
@@ -531,8 +586,15 @@ TEST (block_store, one_block)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::open_block block1 (0, 1, 0, nano::keypair ().prv, 0, 0);
-	block1.sideband_set ({});
+	auto block1 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (0)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block1.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, block1.hash (), block1);
 	ASSERT_TRUE (store->block.exists (transaction, block1.hash ()));
@@ -555,8 +617,22 @@ TEST (block_store, unchecked_begin_search)
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
 	nano::keypair key0;
-	nano::send_block block1 (0, 1, 2, key0.prv, key0.pub, 3);
-	nano::send_block block2 (5, 6, 7, key0.prv, key0.pub, 8);
+	auto block1 = builder
+				  .send ()
+				  .previous (0)
+				  .destination (1)
+				  .balance (2)
+				  .sign (key0.prv, key0.pub)
+				  .work (3)
+				  .build () auto block2
+	= builder
+	  .send ()
+	  .previous (5)
+	  .destination (6)
+	  .balance (7)
+	  .sign (key0.prv, key0.pub)
+	  .work (8)
+	  .build ()
 }
 
 TEST (block_store, frontier_retrieval)
@@ -606,8 +682,15 @@ TEST (block_store, two_block)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::open_block block1 (0, 1, 1, nano::keypair ().prv, 0, 0);
-	block1.sideband_set ({});
+	auto block1 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (1)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block1.sideband_set ({});
 	block1.hashables.account = 1;
 	std::vector<nano::block_hash> hashes;
 	std::vector<nano::open_block> blocks;
@@ -615,8 +698,15 @@ TEST (block_store, two_block)
 	blocks.push_back (block1);
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, hashes[0], block1);
-	nano::open_block block2 (0, 1, 2, nano::keypair ().prv, 0, 0);
-	block2.sideband_set ({});
+	auto block2 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (2)
+				  .sign (nano::keypair ().prv, 0)
+				  .work (0)
+				  .build ()
+				  block2.sideband_set ({});
 	hashes.push_back (block2.hash ());
 	blocks.push_back (block2);
 	store->block.put (transaction, hashes[1], block2);
@@ -779,14 +869,40 @@ TEST (block_store, roots)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::send_block send_block (0, 1, 2, nano::keypair ().prv, 4, 5);
-	ASSERT_EQ (send_block.hashables.previous, send_block.root ());
-	nano::change_block change_block (0, 1, nano::keypair ().prv, 3, 4);
-	ASSERT_EQ (change_block.hashables.previous, change_block.root ());
-	nano::receive_block receive_block (0, 1, nano::keypair ().prv, 3, 4);
-	ASSERT_EQ (receive_block.hashables.previous, receive_block.root ());
-	nano::open_block open_block (0, 1, 2, nano::keypair ().prv, 4, 5);
-	ASSERT_EQ (open_block.hashables.account, open_block.root ());
+	auto send_block = builder
+					  .send ()
+					  .previous (0)
+					  .destination (1)
+					  .balance (2)
+					  .sign (nano::keypair ().prv, 4)
+					  .work (5)
+					  .build ()
+					  ASSERT_EQ (send_block.hashables.previous, send_block.root ());
+	auto change_block = builder
+						.change ()
+						.previous (0)
+						.representative (1)
+						.sign (nano::keypair ().prv, 3)
+						.work (4)
+						.build ()
+						ASSERT_EQ (change_block.hashables.previous, change_block.root ());
+	auto receive_block = builder
+						 .receive ()
+						 .previous (0)
+						 .source (1)
+						 .sign (nano::keypair ().prv, 3)
+						 .work (4)
+						 .build ()
+						 ASSERT_EQ (receive_block.hashables.previous, receive_block.root ());
+	auto open_block = builder
+					  .open ()
+					  .source (0)
+					  .representative (1)
+					  .account (2)
+					  .sign (nano::keypair ().prv, 4)
+					  .work (5)
+					  .build ()
+					  ASSERT_EQ (open_block.hashables.account, open_block.root ());
 }
 
 TEST (block_store, pending_exists)
@@ -875,10 +991,24 @@ TEST (block_store, block_replace)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::send_block send1 (0, 0, 0, nano::keypair ().prv, 0, 1);
-	send1.sideband_set ({});
-	nano::send_block send2 (0, 0, 0, nano::keypair ().prv, 0, 2);
-	send2.sideband_set ({});
+	auto send1 = builder
+				 .send ()
+				 .previous (0)
+				 .destination (0)
+				 .balance (0)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (1)
+				 .build ()
+				 send1.sideband_set ({});
+	auto send2 = builder
+				 .send ()
+				 .previous (0)
+				 .destination (0)
+				 .balance (0)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (2)
+				 .build ()
+				 send2.sideband_set ({});
 	auto transaction (store->tx_begin_write ());
 	store->block.put (transaction, 0, send1);
 	store->block.put (transaction, 0, send2);
@@ -895,8 +1025,15 @@ TEST (block_store, block_count)
 	{
 		auto transaction (store->tx_begin_write ());
 		ASSERT_EQ (0, store->block.count (transaction));
-		nano::open_block block (0, 1, 0, nano::keypair ().prv, 0, 0);
-		block.sideband_set ({});
+		auto block = builder
+					 .open ()
+					 .source (0)
+					 .representative (1)
+					 .account (0)
+					 .sign (nano::keypair ().prv, 0)
+					 .work (0)
+					 .build ()
+					 block.sideband_set ({});
 		auto hash1 (block.hash ());
 		store->block.put (transaction, hash1, block);
 	}
@@ -951,8 +1088,15 @@ TEST (block_store, pruned_random)
 	nano::logger_mt logger;
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_TRUE (!store->init_error ());
-	nano::open_block block (0, 1, 0, nano::keypair ().prv, 0, 0);
-	block.sideband_set ({});
+	auto block = builder
+				 .open ()
+				 .source (0)
+				 .representative (1)
+				 .account (0)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (0)
+				 .build ()
+				 block.sideband_set ({});
 	auto hash1 (block.hash ());
 	{
 		nano::ledger_cache ledger_cache;
@@ -1003,8 +1147,17 @@ TEST (block_store, state_block)
 	auto store = nano::make_store (logger, nano::unique_path (), nano::dev::constants);
 	ASSERT_FALSE (store->init_error ());
 	nano::keypair key1;
-	nano::state_block block1 (1, nano::dev::genesis->hash (), 3, 4, 6, key1.prv, key1.pub, 7);
-	block1.sideband_set ({});
+	auto block1 = builder
+				  .state ()
+				  .account (1)
+				  .previous (nano::dev::genesis->hash ())
+				  .representative (3)
+				  .balance (4)
+				  .link (6)
+				  .sign (key1.prv, key1.pub)
+				  .work (7)
+				  .build ()
+				  block1.sideband_set ({});
 	{
 		nano::ledger_cache ledger_cache;
 		auto transaction (store->tx_begin_write ());
@@ -1046,30 +1199,119 @@ TEST (mdb_block_store, sideband_height)
 	auto transaction (store.tx_begin_write ());
 	store.initialize (transaction, ledger.cache, nano::dev::constants);
 	nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-	nano::send_block send (nano::dev::genesis->hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (nano::dev::genesis->hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, send).code);
-	nano::receive_block receive (send.hash (), send.hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (send.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, receive).code);
-	nano::change_block change (receive.hash (), 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (receive.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, change).code);
-	nano::state_block state_send1 (nano::dev::genesis_key.pub, change.hash (), 0, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, key1.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (change.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_send1).code);
-	nano::state_block state_send2 (nano::dev::genesis_key.pub, state_send1.hash (), 0, nano::dev::constants.genesis_amount - 2 * nano::Gxrb_ratio, key2.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_send1.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_send2).code);
-	nano::state_block state_send3 (nano::dev::genesis_key.pub, state_send2.hash (), 0, nano::dev::constants.genesis_amount - 3 * nano::Gxrb_ratio, key3.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_send2.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_send3).code);
-	nano::state_block state_open (key1.pub, 0, 0, nano::Gxrb_ratio, state_send1.hash (), key1.prv, key1.pub, *pool.generate (key1.pub));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_open).code);
-	nano::state_block epoch (key1.pub, state_open.hash (), 0, nano::Gxrb_ratio, ledger.epoch_link (nano::epoch::epoch_1), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_open.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, epoch).code);
+	auto send = builder
+				.send ()
+				.previous (nano::dev::genesis->hash ())
+				.destination (nano::dev::genesis_key.pub)
+				.balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+				.sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				.work (*pool.generate (nano::dev::genesis->hash ()))
+				.build ()
+				ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, send).code);
+	auto receive = builder
+				   .receive ()
+				   .previous (send.hash ())
+				   .source (send.hash ())
+				   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				   .work (*pool.generate (send.hash ()))
+				   .build ()
+				   ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, receive).code);
+	auto change = builder
+				  .change ()
+				  .previous (receive.hash ())
+				  .representative (0)
+				  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				  .work (*pool.generate (receive.hash ()))
+				  .build ()
+				  ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, change).code);
+	auto state_send1 = builder
+					   .state ()
+					   .account (nano::dev::genesis_key.pub)
+					   .previous (change.hash ())
+					   .representative (0)
+					   .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+					   .link (key1.pub)
+					   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					   .work (*pool.generate (change.hash ()))
+					   .build ()
+					   ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_send1).code);
+	auto state_send2 = builder
+					   .state ()
+					   .account (nano::dev::genesis_key.pub)
+					   .previous (state_send1.hash ())
+					   .representative (0)
+					   .balance (nano::dev::constants.genesis_amount - 2 * nano::Gxrb_ratio)
+					   .link (key2.pub)
+					   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					   .work (*pool.generate (state_send1.hash ()))
+					   .build ()
+					   ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_send2).code);
+	auto state_send3 = builder
+					   .state ()
+					   .account (nano::dev::genesis_key.pub)
+					   .previous (state_send2.hash ())
+					   .representative (0)
+					   .balance (nano::dev::constants.genesis_amount - 3 * nano::Gxrb_ratio)
+					   .link (key3.pub)
+					   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					   .work (*pool.generate (state_send2.hash ()))
+					   .build ()
+					   ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_send3).code);
+	auto state_open = builder
+					  .state ()
+					  .account (key1.pub)
+					  .previous (0)
+					  .representative (0)
+					  .balance (nano::Gxrb_ratio)
+					  .link (state_send1.hash ())
+					  .sign (key1.prv, key1.pub)
+					  .work (*pool.generate (key1.pub))
+					  .build ()
+					  ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_open).code);
+	auto epoch = builder
+				 .state ()
+				 .account (key1.pub)
+				 .previous (state_open.hash ())
+				 .representative (0)
+				 .balance (nano::Gxrb_ratio)
+				 .link (ledger.epoch_link (nano::epoch::epoch_1))
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*pool.generate (state_open.hash ()))
+				 .build ()
+				 ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, epoch).code);
 	ASSERT_EQ (nano::epoch::epoch_1, store.block.version (transaction, epoch.hash ()));
-	nano::state_block epoch_open (key2.pub, 0, 0, 0, ledger.epoch_link (nano::epoch::epoch_1), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (key2.pub));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, epoch_open).code);
+	auto epoch_open = builder
+					  .state ()
+					  .account (key2.pub)
+					  .previous (0)
+					  .representative (0)
+					  .balance (0)
+					  .link (ledger.epoch_link (nano::epoch::epoch_1))
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*pool.generate (key2.pub))
+					  .build ()
+					  ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, epoch_open).code);
 	ASSERT_EQ (nano::epoch::epoch_1, store.block.version (transaction, epoch_open.hash ()));
-	nano::state_block state_receive (key2.pub, epoch_open.hash (), 0, nano::Gxrb_ratio, state_send2.hash (), key2.prv, key2.pub, *pool.generate (epoch_open.hash ()));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_receive).code);
-	nano::open_block open (state_send3.hash (), nano::dev::genesis_key.pub, key3.pub, key3.prv, key3.pub, *pool.generate (key3.pub));
-	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, open).code);
+	auto state_receive = builder
+						 .state ()
+						 .account (key2.pub)
+						 .previous (epoch_open.hash ())
+						 .representative (0)
+						 .balance (nano::Gxrb_ratio)
+						 .link (state_send2.hash ())
+						 .sign (key2.prv, key2.pub)
+						 .work (*pool.generate (epoch_open.hash ()))
+						 .build ()
+						 ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, state_receive).code);
+	auto open = builder
+				.open ()
+				.source (state_send3.hash ())
+				.representative (nano::dev::genesis_key.pub)
+				.account (key3.pub)
+				.sign (key3.prv, key3.pub)
+				.work (*pool.generate (key3.pub))
+				.build ()
+				ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, open).code);
 	auto block1 (store.block.get (transaction, nano::dev::genesis->hash ()));
 	ASSERT_EQ (block1->sideband ().height, 1);
 	auto block2 (store.block.get (transaction, send.hash ()));
@@ -1236,8 +1478,14 @@ TEST (block_store, pruned_blocks)
 	ASSERT_TRUE (!store->init_error ());
 
 	nano::keypair key1;
-	nano::open_block block1 (0, 1, key1.pub, key1.prv, key1.pub, 0);
-	auto hash1 (block1.hash ());
+	auto block1 = builder
+				  .open ()
+				  .source (0)
+				  .representative (1)
+				  .account (key1.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build () auto hash1 (block1.hash ());
 	{
 		auto transaction (store->tx_begin_write ());
 
@@ -1254,8 +1502,15 @@ TEST (block_store, pruned_blocks)
 	ASSERT_EQ (store->pruned.count (store->tx_begin_read ()), 1);
 
 	// Add another one and check that it (and the existing one) can be found
-	nano::open_block block2 (1, 2, key1.pub, key1.prv, key1.pub, 0);
-	block2.sideband_set ({});
+	auto block2 = builder
+				  .open ()
+				  .source (1)
+				  .representative (2)
+				  .account (key1.pub)
+				  .sign (key1.prv, key1.pub)
+				  .work (0)
+				  .build ()
+				  block2.sideband_set ({});
 	auto hash2 (block2.hash ());
 	{
 		auto transaction (store->tx_begin_write ());
@@ -1491,52 +1746,80 @@ namespace lmdb
 			return;
 		}
 		nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-		nano::state_block block1 (nano::dev::genesis_key.pub, nano::dev::genesis->hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (nano::dev::genesis->hash ()));
-		nano::state_block block2 (nano::dev::genesis_key.pub, block1.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio - 1, nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (block1.hash ()));
-		nano::state_block block3 (nano::dev::genesis_key.pub, block2.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio - 2, nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (block2.hash ()));
+		auto block1 = builder
+					  .state ()
+					  .account (nano::dev::genesis_key.pub)
+					  .previous (nano::dev::genesis->hash ())
+					  .representative (nano::dev::genesis_key.pub)
+					  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+					  .link (nano::dev::genesis_key.pub)
+					  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					  .work (*pool.generate (nano::dev::genesis->hash ()))
+					  .build () auto block2
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (block1.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio - 1)
+		  .link (nano::dev::genesis_key.pub)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (block1.hash ()))
+		  .build () auto block3
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (block2.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio - 2)
+		  .link (nano::dev::genesis_key.pub)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (block2.hash ()))
+		  .build ()
 
-		auto code = [&block1, &block2, &block3] (auto confirmation_height, nano::block_hash const & expected_cemented_frontier) {
-			auto path (nano::unique_path ());
-			nano::mdb_val value;
-			{
-				nano::logger_mt logger;
-				nano::lmdb::store store (logger, path, nano::dev::constants);
-				nano::stat stats;
-				nano::ledger ledger (store, stats, nano::dev::constants);
-				auto transaction (store.tx_begin_write ());
-				store.initialize (transaction, ledger.cache, nano::dev::constants);
-				ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, block1).code);
-				ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, block2).code);
-				ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, block3).code);
-				modify_confirmation_height_to_v15 (store, transaction, nano::dev::genesis->account (), confirmation_height);
+		  auto code
+		= [&block1, &block2, &block3] (auto confirmation_height, nano::block_hash const & expected_cemented_frontier) {
+			  auto path (nano::unique_path ());
+			  nano::mdb_val value;
+			  {
+				  nano::logger_mt logger;
+				  nano::lmdb::store store (logger, path, nano::dev::constants);
+				  nano::stat stats;
+				  nano::ledger ledger (store, stats, nano::dev::constants);
+				  auto transaction (store.tx_begin_write ());
+				  store.initialize (transaction, ledger.cache, nano::dev::constants);
+				  ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, block1).code);
+				  ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, block2).code);
+				  ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, block3).code);
+				  modify_confirmation_height_to_v15 (store, transaction, nano::dev::genesis->account (), confirmation_height);
 
-				ASSERT_FALSE (mdb_dbi_open (store.env.tx (transaction), "open", MDB_CREATE, &store.block_store.open_blocks_handle));
-				write_block_w_sideband_v18 (store, store.block_store.open_blocks_handle, transaction, *nano::dev::genesis);
-				ASSERT_FALSE (mdb_dbi_open (store.env.tx (transaction), "state_blocks", MDB_CREATE, &store.block_store.state_blocks_handle));
-				write_block_w_sideband_v18 (store, store.block_store.state_blocks_handle, transaction, block1);
-				write_block_w_sideband_v18 (store, store.block_store.state_blocks_handle, transaction, block2);
-				write_block_w_sideband_v18 (store, store.block_store.state_blocks_handle, transaction, block3);
+				  ASSERT_FALSE (mdb_dbi_open (store.env.tx (transaction), "open", MDB_CREATE, &store.block_store.open_blocks_handle));
+				  write_block_w_sideband_v18 (store, store.block_store.open_blocks_handle, transaction, *nano::dev::genesis);
+				  ASSERT_FALSE (mdb_dbi_open (store.env.tx (transaction), "state_blocks", MDB_CREATE, &store.block_store.state_blocks_handle));
+				  write_block_w_sideband_v18 (store, store.block_store.state_blocks_handle, transaction, block1);
+				  write_block_w_sideband_v18 (store, store.block_store.state_blocks_handle, transaction, block2);
+				  write_block_w_sideband_v18 (store, store.block_store.state_blocks_handle, transaction, block3);
 
-				// Lower the database to the previous version
-				store.version.put (transaction, 16);
-			}
+				  // Lower the database to the previous version
+				  store.version.put (transaction, 16);
+			  }
 
-			// Now do the upgrade
-			nano::logger_mt logger;
-			nano::lmdb::store store (logger, path, nano::dev::constants);
-			ASSERT_FALSE (store.init_error ());
-			auto transaction (store.tx_begin_read ());
+			  // Now do the upgrade
+			  nano::logger_mt logger;
+			  nano::lmdb::store store (logger, path, nano::dev::constants);
+			  ASSERT_FALSE (store.init_error ());
+			  auto transaction (store.tx_begin_read ());
 
-			nano::confirmation_height_info confirmation_height_info;
-			ASSERT_FALSE (store.confirmation_height.get (transaction, nano::dev::genesis->account (), confirmation_height_info));
-			ASSERT_EQ (confirmation_height_info.height, confirmation_height);
+			  nano::confirmation_height_info confirmation_height_info;
+			  ASSERT_FALSE (store.confirmation_height.get (transaction, nano::dev::genesis->account (), confirmation_height_info));
+			  ASSERT_EQ (confirmation_height_info.height, confirmation_height);
 
-			// Check confirmation height frontier is correct
-			ASSERT_EQ (confirmation_height_info.frontier, expected_cemented_frontier);
+			  // Check confirmation height frontier is correct
+			  ASSERT_EQ (confirmation_height_info.frontier, expected_cemented_frontier);
 
-			// Version should be correct
-			ASSERT_LT (16, store.version.get (transaction));
-		};
+			  // Version should be correct
+			  ASSERT_LT (16, store.version.get (transaction));
+		  };
 
 		code (0, nano::block_hash (0));
 		code (1, nano::dev::genesis->hash ());
@@ -1557,18 +1840,124 @@ namespace lmdb
 		nano::keypair key2;
 		nano::keypair key3;
 		nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-		nano::send_block send_zero (nano::dev::genesis->hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (nano::dev::genesis->hash ()));
-		nano::state_block state_receive_zero (nano::dev::genesis_key.pub, send_zero.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount, send_zero.hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (send_zero.hash ()));
-		nano::state_block epoch (nano::dev::genesis_key.pub, state_receive_zero.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount, nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_1), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_receive_zero.hash ()));
-		nano::state_block state_send (nano::dev::genesis_key.pub, epoch.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (epoch.hash ()));
-		nano::state_block state_receive (nano::dev::genesis_key.pub, state_send.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount, state_send.hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_send.hash ()));
-		nano::state_block state_change (nano::dev::genesis_key.pub, state_receive.hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_receive.hash ()));
-		nano::state_block state_send_change (nano::dev::genesis_key.pub, state_change.hash (), key1.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, key1.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_change.hash ()));
-		nano::state_block epoch_first (key1.pub, 0, 0, 0, nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_2), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (key1.pub));
-		nano::state_block state_receive2 (key1.pub, epoch_first.hash (), key1.pub, nano::Gxrb_ratio, state_send_change.hash (), key1.prv, key1.pub, *pool.generate (epoch_first.hash ()));
-		nano::state_block state_send2 (nano::dev::genesis_key.pub, state_send_change.hash (), key1.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio * 2, key2.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_send_change.hash ()));
-		nano::state_block state_open (key2.pub, 0, key2.pub, nano::Gxrb_ratio, state_send2.hash (), key2.prv, key2.pub, *pool.generate (key2.pub));
-		nano::state_block state_send_epoch_link (key2.pub, state_open.hash (), key2.pub, 0, nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_2), key2.prv, key2.pub, *pool.generate (state_open.hash ()));
+		auto send_zero = builder
+						 .send ()
+						 .previous (nano::dev::genesis->hash ())
+						 .destination (nano::dev::genesis_key.pub)
+						 .balance (nano::dev::constants.genesis_amount)
+						 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+						 .work (*pool.generate (nano::dev::genesis->hash ()))
+						 .build () auto state_receive_zero
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (send_zero.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount)
+		  .link (send_zero.hash ())
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (send_zero.hash ()))
+		  .build () auto epoch
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (state_receive_zero.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount)
+		  .link (nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_1))
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (state_receive_zero.hash ()))
+		  .build () auto state_send
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (epoch.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+		  .link (nano::dev::genesis_key.pub)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (epoch.hash ()))
+		  .build () auto state_receive
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (state_send.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount)
+		  .link (state_send.hash ())
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (state_send.hash ()))
+		  .build () auto state_change
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (state_receive.hash ())
+		  .representative (nano::dev::genesis_key.pub)
+		  .balance (nano::dev::constants.genesis_amount)
+		  .link (0)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (state_receive.hash ()))
+		  .build () auto state_send_change
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (state_change.hash ())
+		  .representative (key1.pub)
+		  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+		  .link (key1.pub)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (state_change.hash ()))
+		  .build () auto epoch_first
+		= builder
+		  .state ()
+		  .account (key1.pub)
+		  .previous (0)
+		  .representative (0)
+		  .balance (0)
+		  .link (nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_2))
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (key1.pub))
+		  .build () auto state_receive2
+		= builder
+		  .state ()
+		  .account (key1.pub)
+		  .previous (epoch_first.hash ())
+		  .representative (key1.pub)
+		  .balance (nano::Gxrb_ratio)
+		  .link (state_send_change.hash ())
+		  .sign (key1.prv, key1.pub)
+		  .work (*pool.generate (epoch_first.hash ()))
+		  .build () auto state_send2
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (state_send_change.hash ())
+		  .representative (key1.pub)
+		  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio * 2)
+		  .link (key2.pub)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (state_send_change.hash ()))
+		  .build () auto state_open
+		= builder
+		  .state ()
+		  .account (key2.pub)
+		  .previous (0)
+		  .representative (key2.pub)
+		  .balance (nano::Gxrb_ratio)
+		  .link (state_send2.hash ())
+		  .sign (key2.prv, key2.pub)
+		  .work (*pool.generate (key2.pub))
+		  .build () auto state_send_epoch_link
+		= builder
+		  .state ()
+		  .account (key2.pub)
+		  .previous (state_open.hash ())
+		  .representative (key2.pub)
+		  .balance (0)
+		  .link (nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_2))
+		  .sign (key2.prv, key2.pub)
+		  .work (*pool.generate (state_open.hash ()))
+		  .build ()
 		{
 			nano::logger_mt logger;
 			nano::lmdb::store store (logger, path, nano::dev::constants);
@@ -1757,12 +2146,58 @@ namespace lmdb
 		auto path (nano::unique_path ());
 		nano::keypair key1;
 		nano::work_pool pool{ nano::dev::network_params.network, std::numeric_limits<unsigned>::max () };
-		nano::send_block send (nano::dev::genesis->hash (), nano::dev::genesis_key.pub, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (nano::dev::genesis->hash ()));
-		nano::receive_block receive (send.hash (), send.hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (send.hash ()));
-		nano::change_block change (receive.hash (), 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (receive.hash ()));
-		nano::state_block state_epoch (nano::dev::genesis_key.pub, change.hash (), 0, nano::dev::constants.genesis_amount, nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_1), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (change.hash ()));
-		nano::state_block state_send (nano::dev::genesis_key.pub, state_epoch.hash (), 0, nano::dev::constants.genesis_amount - nano::Gxrb_ratio, key1.pub, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *pool.generate (state_epoch.hash ()));
-		nano::state_block state_open (key1.pub, 0, 0, nano::Gxrb_ratio, state_send.hash (), key1.prv, key1.pub, *pool.generate (key1.pub));
+		auto send = builder
+					.send ()
+					.previous (nano::dev::genesis->hash ())
+					.destination (nano::dev::genesis_key.pub)
+					.balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+					.sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					.work (*pool.generate (nano::dev::genesis->hash ()))
+					.build () auto receive
+		= builder
+		  .receive ()
+		  .previous (send.hash ())
+		  .source (send.hash ())
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (send.hash ()))
+		  .build () auto change
+		= builder
+		  .change ()
+		  .previous (receive.hash ())
+		  .representative (0)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (receive.hash ()))
+		  .build () auto state_epoch
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (change.hash ())
+		  .representative (0)
+		  .balance (nano::dev::constants.genesis_amount)
+		  .link (nano::dev::network_params.ledger.epochs.link (nano::epoch::epoch_1))
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (change.hash ()))
+		  .build () auto state_send
+		= builder
+		  .state ()
+		  .account (nano::dev::genesis_key.pub)
+		  .previous (state_epoch.hash ())
+		  .representative (0)
+		  .balance (nano::dev::constants.genesis_amount - nano::Gxrb_ratio)
+		  .link (key1.pub)
+		  .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+		  .work (*pool.generate (state_epoch.hash ()))
+		  .build () auto state_open
+		= builder
+		  .state ()
+		  .account (key1.pub)
+		  .previous (0)
+		  .representative (0)
+		  .balance (nano::Gxrb_ratio)
+		  .link (state_send.hash ())
+		  .sign (key1.prv, key1.pub)
+		  .work (*pool.generate (key1.pub))
+		  .build ()
 
 		{
 			nano::logger_mt logger;
@@ -2046,8 +2481,15 @@ TEST (block_store, reset_renew_existing_transaction)
 	ASSERT_TRUE (!store->init_error ());
 
 	nano::keypair key1;
-	nano::open_block block (0, 1, 1, nano::keypair ().prv, 0, 0);
-	block.sideband_set ({});
+	auto block = builder
+				 .open ()
+				 .source (0)
+				 .representative (1)
+				 .account (1)
+				 .sign (nano::keypair ().prv, 0)
+				 .work (0)
+				 .build ()
+				 block.sideband_set ({});
 	auto hash1 (block.hash ());
 	auto read_transaction = store->tx_begin_read ();
 

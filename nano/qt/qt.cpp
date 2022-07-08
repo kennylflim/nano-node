@@ -2236,8 +2236,17 @@ void nano_qt::block_creation::create_send ()
 						auto error (wallet.node.store.account.get (block_transaction, account_l, info));
 						(void)error;
 						debug_assert (!error);
-						nano::state_block send (account_l, info.head, info.representative, balance - amount_l.number (), destination_l, key, account_l, 0);
-						nano::block_details details;
+						auto send = builder
+									.state ()
+									.account (account_l)
+									.previous (info.head)
+									.representative (info.representative)
+									.balance (balance - amount_l.number ())
+									.link (destination_l)
+									.sign (key, account_l)
+									.work (0)
+									.build ()
+									nano::block_details details;
 						details.is_send = true;
 						details.epoch = info.epoch ();
 						auto const required_difficulty{ wallet.node.network_params.work.threshold (send.work_version (), details) };
@@ -2320,8 +2329,17 @@ void nano_qt::block_creation::create_receive ()
 						auto error (wallet.wallet_m->store.fetch (transaction, pending_key.account, key));
 						if (!error)
 						{
-							nano::state_block receive (pending_key.account, info.head, info.representative, info.balance.number () + pending.amount.number (), source_l, key, pending_key.account, 0);
-							nano::block_details details;
+							auto receive = builder
+										   .state ()
+										   .account (pending_key.account)
+										   .previous (info.head)
+										   .representative (info.representative)
+										   .balance (info.balance.number () + pending.amount.number ())
+										   .link (source_l)
+										   .sign (key, pending_key.account)
+										   .work (0)
+										   .build ()
+										   nano::block_details details;
 							details.is_receive = true;
 							details.epoch = std::max (info.epoch (), pending.epoch);
 							auto required_difficulty{ wallet.node.network_params.work.threshold (receive.work_version (), details) };
@@ -2404,8 +2422,17 @@ void nano_qt::block_creation::create_change ()
 				auto error (wallet.wallet_m->store.fetch (transaction, account_l, key));
 				if (!error)
 				{
-					nano::state_block change (account_l, info.head, representative_l, info.balance, 0, key, account_l, 0);
-					nano::block_details details;
+					auto change = builder
+								  .state ()
+								  .account (account_l)
+								  .previous (info.head)
+								  .representative (representative_l)
+								  .balance (info.balance)
+								  .link (0)
+								  .sign (key, account_l)
+								  .work (0)
+								  .build ()
+								  nano::block_details details;
 					details.epoch = info.epoch ();
 					auto const required_difficulty{ wallet.node.network_params.work.threshold (change.work_version (), details) };
 					if (wallet.node.work_generate_blocking (change, required_difficulty).is_initialized ())
@@ -2485,8 +2512,17 @@ void nano_qt::block_creation::create_open ()
 							auto error (wallet.wallet_m->store.fetch (transaction, pending_key.account, key));
 							if (!error)
 							{
-								nano::state_block open (pending_key.account, 0, representative_l, pending.amount, source_l, key, pending_key.account, 0);
-								nano::block_details details;
+								auto open = builder
+											.state ()
+											.account (pending_key.account)
+											.previous (0)
+											.representative (representative_l)
+											.balance (pending.amount)
+											.link (source_l)
+											.sign (key, pending_key.account)
+											.work (0)
+											.build ()
+											nano::block_details details;
 								details.is_receive = true;
 								details.epoch = pending.epoch;
 								auto const required_difficulty{ wallet.node.network_params.work.threshold (open.work_version (), details) };

@@ -509,8 +509,13 @@ int main (int argc, char * const * argv)
 			}
 
 			nano::work_pool work{ network_params.network, std::numeric_limits<unsigned>::max (), pow_rate_limiter };
-			nano::change_block block (0, 0, nano::keypair ().prv, 0, 0);
-			if (!result)
+			auto block = builder
+						 .change ()
+						 .previous (0)
+						 .representative (0)
+						 .sign (nano::keypair ().prv, 0)
+						 .work (0)
+						 .build () if (!result)
 			{
 				std::cerr << boost::str (boost::format ("Starting generation profiling. Difficulty: %1$#x (%2%x from base difficulty %3$#x)\n") % difficulty % nano::to_string (nano::difficulty::to_multiplier (difficulty, nano::work_thresholds::publish_full.base), 4) % nano::work_thresholds::publish_full.base);
 				while (!result)
@@ -630,8 +635,15 @@ int main (int argc, char * const * argv)
 														  return opencl->generate_work (version_a, root_a, difficulty_a);
 													  }
 																													   : std::function<boost::optional<uint64_t> (nano::work_version const, nano::root const &, uint64_t, std::atomic<int> &)> (nullptr) };
-							nano::change_block block (0, 0, nano::keypair ().prv, 0, 0);
-							std::cerr << boost::str (boost::format ("Starting OpenCL generation profiling. Platform: %1%. Device: %2%. Threads: %3%. Difficulty: %4$#x (%5%x from base difficulty %6$#x)\n") % platform % device % threads % difficulty % nano::to_string (nano::difficulty::to_multiplier (difficulty, nano::work_thresholds::publish_full.base), 4) % nano::work_thresholds::publish_full.base);
+							auto block = builder
+										 .change ()
+										 .previous (0)
+										 .representative (0)
+										 .sign (nano::keypair ().prv, 0)
+										 .work (0)
+										 .build ()
+										 std::cerr
+							<< boost::str (boost::format ("Starting OpenCL generation profiling. Platform: %1%. Device: %2%. Threads: %3%. Difficulty: %4$#x (%5%x from base difficulty %6$#x)\n") % platform % device % threads % difficulty % nano::to_string (nano::difficulty::to_multiplier (difficulty, nano::work_thresholds::publish_full.base), 4) % nano::work_thresholds::publish_full.base);
 							for (uint64_t i (0); true; ++i)
 							{
 								block.hashables.previous.qwords[0] += 1;
@@ -894,8 +906,16 @@ int main (int argc, char * const * argv)
 				auto begin1 (std::chrono::high_resolution_clock::now ());
 				for (uint64_t balance (0); balance < 1000; ++balance)
 				{
-					nano::send_block send (latest, key.pub, balance, key.prv, key.pub, 0);
-					latest = send.hash ();
+					auto send = builder
+								.send ()
+								.previous (latest)
+								.destination (key.pub)
+								.balance (balance)
+								.sign (key.prv, key.pub)
+								.work (0)
+								.build ()
+								latest
+					= send.hash ();
 				}
 				auto end1 (std::chrono::high_resolution_clock::now ());
 				std::cerr << boost::str (boost::format ("%|1$ 12d|\n") % std::chrono::duration_cast<std::chrono::microseconds> (end1 - begin1).count ());

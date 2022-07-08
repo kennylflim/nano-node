@@ -13,8 +13,17 @@ TEST (signature_checker, empty)
 TEST (signature_checker, bulk_single_thread)
 {
 	nano::keypair key;
-	nano::state_block block (key.pub, 0, key.pub, 0, 0, key.prv, key.pub, 0);
-	nano::signature_checker checker (0);
+	auto block = builder
+				 .state ()
+				 .account (key.pub)
+				 .previous (0)
+				 .representative (key.pub)
+				 .balance (0)
+				 .link (0)
+				 .sign (key.prv, key.pub)
+				 .work (0)
+				 .build ()
+				 nano::signature_checker checker (0);
 	std::vector<nano::uint256_union> hashes;
 	size_t size (1000);
 	hashes.reserve (size);
@@ -48,11 +57,30 @@ TEST (signature_checker, many_multi_threaded)
 
 	auto signature_checker_work_func = [&checker] () {
 		nano::keypair key;
-		nano::state_block block (key.pub, 0, key.pub, 0, 0, key.prv, key.pub, 0);
-		auto block_hash = block.hash ();
+		auto block = builder
+					 .state ()
+					 .account (key.pub)
+					 .previous (0)
+					 .representative (key.pub)
+					 .balance (0)
+					 .link (0)
+					 .sign (key.prv, key.pub)
+					 .work (0)
+					 .build () auto block_hash
+		= block.hash ();
 
-		nano::state_block invalid_block (key.pub, 0, key.pub, 0, 0, key.prv, key.pub, 0);
-		invalid_block.signature.bytes[31] ^= 0x1;
+		auto invalid_block = builder
+							 .state ()
+							 .account (key.pub)
+							 .previous (0)
+							 .representative (key.pub)
+							 .balance (0)
+							 .link (0)
+							 .sign (key.prv, key.pub)
+							 .work (0)
+							 .build ()
+							 invalid_block.signature.bytes[31]
+		^= 0x1;
 		auto invalid_block_hash = block.hash ();
 
 		constexpr auto num_check_sizes = 18;
@@ -137,10 +165,20 @@ TEST (signature_checker, one)
 	};
 
 	nano::keypair key;
-	nano::state_block block (key.pub, 0, key.pub, 0, 0, key.prv, key.pub, 0);
+	auto block = builder
+				 .state ()
+				 .account (key.pub)
+				 .previous (0)
+				 .representative (key.pub)
+				 .balance (0)
+				 .link (0)
+				 .sign (key.prv, key.pub)
+				 .work (0)
+				 .build ()
 
-	// Make signaure invalid and check result is incorrect
-	block.signature.bytes[31] ^= 0x1;
+				 // Make signaure invalid and check result is incorrect
+				 block.signature.bytes[31]
+	^= 0x1;
 	verify_block (block, 0);
 
 	// Make it valid and check for succcess
@@ -174,9 +212,19 @@ TEST (signature_checker, boundary_checks)
 	std::vector<unsigned char const *> signatures;
 	signatures.reserve (max_size);
 	nano::keypair key;
-	nano::state_block block (key.pub, 0, key.pub, 0, 0, key.prv, key.pub, 0);
+	auto block = builder
+				 .state ()
+				 .account (key.pub)
+				 .previous (0)
+				 .representative (key.pub)
+				 .balance (0)
+				 .link (0)
+				 .sign (key.prv, key.pub)
+				 .work (0)
+				 .build ()
 
-	size_t last_size = 0;
+				 size_t last_size
+	= 0;
 	for (auto size : sizes)
 	{
 		// The size needed to append to existing containers, saves re-initializing from scratch each iteration

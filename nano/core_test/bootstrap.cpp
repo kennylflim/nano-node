@@ -55,8 +55,16 @@ TEST (bulk_pull, end_not_owned)
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
 	ASSERT_NE (nullptr, system.wallet (0)->send_action (nano::dev::genesis_key.pub, key2.pub, 100));
 	nano::block_hash latest (system.nodes[0]->latest (nano::dev::genesis_key.pub));
-	nano::open_block open (0, 1, 2, nano::keypair ().prv, 4, 5);
-	open.hashables.account = key2.pub;
+	auto open = builder
+				.open ()
+				.source (0)
+				.representative (1)
+				.account (2)
+				.sign (nano::keypair ().prv, 4)
+				.work (5)
+				.build ()
+				open.hashables.account
+	= key2.pub;
 	open.hashables.representative = key2.pub;
 	open.hashables.source = latest;
 	open.refresh ();
@@ -140,10 +148,23 @@ TEST (bulk_pull, count_limit)
 	nano::system system (1);
 	auto node0 (system.nodes[0]);
 
-	auto send1 (std::make_shared<nano::send_block> (node0->latest (nano::dev::genesis_key.pub), nano::dev::genesis_key.pub, 1, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (node0->latest (nano::dev::genesis_key.pub))));
-	ASSERT_EQ (nano::process_result::progress, node0->process (*send1).code);
-	auto receive1 (std::make_shared<nano::receive_block> (send1->hash (), send1->hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (send1->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node0->process (*receive1).code);
+	auto send1 = builder
+				 .send ()
+				 .previous (node0->latest (nano::dev::genesis_key.pub))
+				 .destination (nano::dev::genesis_key.pub)
+				 .balance (1)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (node0->latest (nano::dev::genesis_key.pub)))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node0->process (*send1).code);
+	auto receive1 = builder
+					.receive ()
+					.previous (send1->hash ())
+					.source (send1->hash ())
+					.sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+					.work (*system.work.generate (send1->hash ()))
+					.build_shared ()
+					ASSERT_EQ (nano::process_result::progress, node0->process (*receive1).code);
 
 	auto connection (std::make_shared<nano::bootstrap_server> (std::make_shared<nano::socket> (*node0, nano::socket::endpoint_type_t::server), node0));
 	auto req = std::make_unique<nano::bulk_pull> (nano::dev::network_params.network);
@@ -320,14 +341,41 @@ TEST (bootstrap_processor, pull_diamond)
 	node_flags.disable_bootstrap_bulk_push_client = true;
 	auto node0 (system.add_node (config, node_flags));
 	nano::keypair key;
-	auto send1 (std::make_shared<nano::send_block> (node0->latest (nano::dev::genesis_key.pub), key.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (node0->latest (nano::dev::genesis_key.pub))));
-	ASSERT_EQ (nano::process_result::progress, node0->process (*send1).code);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), 1, key.pub, key.prv, key.pub, *system.work.generate (key.pub)));
-	ASSERT_EQ (nano::process_result::progress, node0->process (*open).code);
-	auto send2 (std::make_shared<nano::send_block> (open->hash (), nano::dev::genesis_key.pub, std::numeric_limits<nano::uint128_t>::max () - 100, key.prv, key.pub, *system.work.generate (open->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node0->process (*send2).code);
-	auto receive (std::make_shared<nano::receive_block> (send1->hash (), send2->hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (send1->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node0->process (*receive).code);
+	auto send1 = builder
+				 .send ()
+				 .previous (node0->latest (nano::dev::genesis_key.pub))
+				 .destination (key.pub)
+				 .balance (0)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (node0->latest (nano::dev::genesis_key.pub)))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node0->process (*send1).code);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (1)
+				.account (key.pub)
+				.sign (key.prv, key.pub)
+				.work (*system.work.generate (key.pub))
+				.build_shared ()
+				ASSERT_EQ (nano::process_result::progress, node0->process (*open).code);
+	auto send2 = builder
+				 .send ()
+				 .previous (open->hash ())
+				 .destination (nano::dev::genesis_key.pub)
+				 .balance (std::numeric_limits<nano::uint128_t>::max () - 100)
+				 .sign (key.prv, key.pub)
+				 .work (*system.work.generate (open->hash ()))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node0->process (*send2).code);
+	auto receive = builder
+				   .receive ()
+				   .previous (send1->hash ())
+				   .source (send2->hash ())
+				   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				   .work (*system.work.generate (send1->hash ()))
+				   .build_shared ()
+				   ASSERT_EQ (nano::process_result::progress, node0->process (*receive).code);
 	auto node1 (std::make_shared<nano::node> (system.io_ctx, nano::get_available_port (), nano::unique_path (), system.logging, system.work));
 	ASSERT_FALSE (node1->init_error ());
 	node1->bootstrap_initiator.bootstrap (node0->network.endpoint (), false);
@@ -394,14 +442,41 @@ TEST (bootstrap_processor, DISABLED_push_diamond)
 	auto wallet1 (node1->wallets.create (100));
 	wallet1->insert_adhoc (nano::dev::genesis_key.prv);
 	wallet1->insert_adhoc (key.prv);
-	auto send1 (std::make_shared<nano::send_block> (node0->latest (nano::dev::genesis_key.pub), key.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (node0->latest (nano::dev::genesis_key.pub))));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*send1).code);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), 1, key.pub, key.prv, key.pub, *system.work.generate (key.pub)));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
-	auto send2 (std::make_shared<nano::send_block> (open->hash (), nano::dev::genesis_key.pub, std::numeric_limits<nano::uint128_t>::max () - 100, key.prv, key.pub, *system.work.generate (open->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*send2).code);
-	auto receive (std::make_shared<nano::receive_block> (send1->hash (), send2->hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (send1->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*receive).code);
+	auto send1 = builder
+				 .send ()
+				 .previous (node0->latest (nano::dev::genesis_key.pub))
+				 .destination (key.pub)
+				 .balance (0)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (node0->latest (nano::dev::genesis_key.pub)))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node1->process (*send1).code);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (1)
+				.account (key.pub)
+				.sign (key.prv, key.pub)
+				.work (*system.work.generate (key.pub))
+				.build_shared ()
+				ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
+	auto send2 = builder
+				 .send ()
+				 .previous (open->hash ())
+				 .destination (nano::dev::genesis_key.pub)
+				 .balance (std::numeric_limits<nano::uint128_t>::max () - 100)
+				 .sign (key.prv, key.pub)
+				 .work (*system.work.generate (open->hash ()))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node1->process (*send2).code);
+	auto receive = builder
+				   .receive ()
+				   .previous (send1->hash ())
+				   .source (send2->hash ())
+				   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				   .work (*system.work.generate (send1->hash ()))
+				   .build_shared ()
+				   ASSERT_EQ (nano::process_result::progress, node1->process (*receive).code);
 	node1->bootstrap_initiator.bootstrap (node0->network.endpoint (), false);
 	ASSERT_TIMELY (10s, node0->balance (nano::dev::genesis_key.pub) == 100);
 	ASSERT_EQ (100, node0->balance (nano::dev::genesis_key.pub));
@@ -426,18 +501,45 @@ TEST (bootstrap_processor, DISABLED_push_diamond_pruning)
 	auto node1 (std::make_shared<nano::node> (system.io_ctx, nano::unique_path (), config, system.work, node_flags, 1));
 	ASSERT_FALSE (node1->init_error ());
 	auto latest (node0->latest (nano::dev::genesis_key.pub));
-	auto send1 (std::make_shared<nano::send_block> (latest, key.pub, 0, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (latest)));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*send1).code);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), 1, key.pub, key.prv, key.pub, *system.work.generate (key.pub)));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
+	auto send1 = builder
+				 .send ()
+				 .previous (latest)
+				 .destination (key.pub)
+				 .balance (0)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (*system.work.generate (latest))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node1->process (*send1).code);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (1)
+				.account (key.pub)
+				.sign (key.prv, key.pub)
+				.work (*system.work.generate (key.pub))
+				.build_shared ()
+				ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
 	// 1st bootstrap
 	node1->bootstrap_initiator.bootstrap (node0->network.endpoint (), false);
 	ASSERT_TIMELY (10s, node0->balance (key.pub) == nano::dev::constants.genesis_amount);
 	// Process more blocks & prune old
-	auto send2 (std::make_shared<nano::send_block> (open->hash (), nano::dev::genesis_key.pub, std::numeric_limits<nano::uint128_t>::max () - 100, key.prv, key.pub, *system.work.generate (open->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*send2).code);
-	auto receive (std::make_shared<nano::receive_block> (send1->hash (), send2->hash (), nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, *system.work.generate (send1->hash ())));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*receive).code);
+	auto send2 = builder
+				 .send ()
+				 .previous (open->hash ())
+				 .destination (nano::dev::genesis_key.pub)
+				 .balance (std::numeric_limits<nano::uint128_t>::max () - 100)
+				 .sign (key.prv, key.pub)
+				 .work (*system.work.generate (open->hash ()))
+				 .build_shared ()
+				 ASSERT_EQ (nano::process_result::progress, node1->process (*send2).code);
+	auto receive = builder
+				   .receive ()
+				   .previous (send1->hash ())
+				   .source (send2->hash ())
+				   .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				   .work (*system.work.generate (send1->hash ()))
+				   .build_shared ()
+				   ASSERT_EQ (nano::process_result::progress, node1->process (*receive).code);
 	{
 		auto transaction (node1->store.tx_begin_write ());
 		ASSERT_EQ (1, node1->ledger.pruning_action (transaction, send1->hash (), 2));
@@ -902,8 +1004,15 @@ TEST (bootstrap_processor, DISABLED_lazy_unclear_state_link)
 				 .work (*system.work.generate (send1->hash ()))
 				 .build_shared ();
 	ASSERT_EQ (nano::process_result::progress, node1->process (*send2).code);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), key.pub, key.pub, key.prv, key.pub, *system.work.generate (key.pub)));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (key.pub)
+				.account (key.pub)
+				.sign (key.prv, key.pub)
+				.work (*system.work.generate (key.pub))
+				.build_shared ()
+				ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
 	auto receive = builder
 				   .make_block ()
 				   .account (key.pub)
@@ -952,8 +1061,15 @@ TEST (bootstrap_processor, lazy_unclear_state_link_not_existing)
 				 .work (*system.work.generate (nano::dev::genesis->hash ()))
 				 .build_shared ();
 	ASSERT_EQ (nano::process_result::progress, node1->process (*send1).code);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), key.pub, key.pub, key.prv, key.pub, *system.work.generate (key.pub)));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (key.pub)
+				.account (key.pub)
+				.sign (key.prv, key.pub)
+				.work (*system.work.generate (key.pub))
+				.build_shared ()
+				ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
 	auto send2 = builder
 				 .make_block ()
 				 .account (key.pub)
@@ -1013,8 +1129,15 @@ TEST (bootstrap_processor, DISABLED_lazy_destinations)
 				 .work (*system.work.generate (send1->hash ()))
 				 .build_shared ();
 	ASSERT_EQ (nano::process_result::progress, node1->process (*send2).code);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), key1.pub, key1.pub, key1.prv, key1.pub, *system.work.generate (key1.pub)));
-	ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (key1.pub)
+				.account (key1.pub)
+				.sign (key1.prv, key1.pub)
+				.work (*system.work.generate (key1.pub))
+				.build_shared ()
+				ASSERT_EQ (nano::process_result::progress, node1->process (*open).code);
 	auto state_open = builder
 					  .make_block ()
 					  .account (key2.pub)
@@ -1076,8 +1199,15 @@ TEST (bootstrap_processor, lazy_pruning_missing_block)
 				 .work (*system.work.generate (send1->hash ()))
 				 .build_shared ();
 	node1->process_active (send2);
-	auto open (std::make_shared<nano::open_block> (send1->hash (), key1.pub, key1.pub, key1.prv, key1.pub, *system.work.generate (key1.pub)));
-	node1->process_active (open);
+	auto open = builder
+				.open ()
+				.source (send1->hash ())
+				.representative (key1.pub)
+				.account (key1.pub)
+				.sign (key1.prv, key1.pub)
+				.work (*system.work.generate (key1.pub))
+				.build_shared ()
+				node1->process_active (open);
 	auto state_open = builder
 					  .make_block ()
 					  .account (key2.pub)

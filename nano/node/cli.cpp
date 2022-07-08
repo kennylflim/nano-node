@@ -725,8 +725,16 @@ std::error_code nano::handle_node_options (boost::program_options::variables_map
 		std::cout << "Testing hash function" << std::endl;
 		nano::raw_key key;
 		key.clear ();
-		nano::send_block send (0, 0, 0, key, 0, 0);
-		std::cout << "Testing key derivation function" << std::endl;
+		auto send = builder
+					.send ()
+					.previous (0)
+					.destination (0)
+					.balance (0)
+					.sign (key, 0)
+					.work (0)
+					.build ()
+					std::cout
+		<< "Testing key derivation function" << std::endl;
 		nano::raw_key junk1;
 		junk1.clear ();
 		nano::uint256_union junk2 (0);

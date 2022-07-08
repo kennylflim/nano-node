@@ -1508,7 +1508,14 @@ TEST (node, DISABLED_bootstrap_no_publish)
 	auto node1 (system1.nodes[0]);
 	nano::keypair key0;
 	// node0 knows about send0 but node1 doesn't.
-	nano::send_block send0 (node0->latest (nano::dev::genesis_key.pub), key0.pub, 500, nano::dev::genesis_key.prv, nano::dev::genesis_key.pub, 0);
+	auto send0 = builder
+				 .send ()
+				 .previous (node0->latest (nano::dev::genesis_key.pub))
+				 .destination (key0.pub)
+				 .balance (500)
+				 .sign (nano::dev::genesis_key.prv, nano::dev::genesis_key.pub)
+				 .work (0)
+				 .build ()
 	{
 		auto transaction (node0->store.tx_begin_write ());
 		ASSERT_EQ (nano::process_result::progress, node0->ledger.process (transaction, send0).code);
