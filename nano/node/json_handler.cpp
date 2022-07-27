@@ -1845,6 +1845,13 @@ void nano::json_handler::bootstrap_any ()
 	response_errors ();
 }
 
+void nano::json_handler::bootstrap_ascending ()
+{
+	node.bootstrap_initiator.bootstrap_ascending ();
+	response_l.put ("success", "");
+	response_errors ();
+}
+
 void nano::json_handler::bootstrap_lazy ()
 {
 	auto hash (hash_impl ());
@@ -5312,6 +5319,7 @@ ipc_json_handler_no_arg_func_map create_ipc_json_handler_no_arg_func_map ()
 	no_arg_funcs.emplace ("block_hash", &nano::json_handler::block_hash);
 	no_arg_funcs.emplace ("bootstrap", &nano::json_handler::bootstrap);
 	no_arg_funcs.emplace ("bootstrap_any", &nano::json_handler::bootstrap_any);
+	no_arg_funcs.emplace ("bootstrap_ascending", &nano::json_handler::bootstrap_ascending);
 	no_arg_funcs.emplace ("bootstrap_lazy", &nano::json_handler::bootstrap_lazy);
 	no_arg_funcs.emplace ("bootstrap_status", &nano::json_handler::bootstrap_status);
 	no_arg_funcs.emplace ("confirmation_active", &nano::json_handler::confirmation_active);

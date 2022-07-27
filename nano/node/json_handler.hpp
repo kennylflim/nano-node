@@ -57,6 +57,7 @@ public:
 	void block_hash ();
 	void bootstrap ();
 	void bootstrap_any ();
+	void bootstrap_ascending ();
 	void bootstrap_lazy ();
 	void bootstrap_status ();
 	void chain (bool = false);
