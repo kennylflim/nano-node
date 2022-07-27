@@ -13,8 +13,16 @@ void nano::lmdb::unchecked_store::clear (nano::write_transaction const & transac
 
 void nano::lmdb::unchecked_store::put (nano::write_transaction const & transaction_a, nano::hash_or_account const & dependency, nano::unchecked_info const & info)
 {
-	auto status = store.put (transaction_a, tables::unchecked, nano::unchecked_key{ dependency, info.block->hash () }, info);
-	store.release_assert_success (status);
+	nano::unchecked_key key{ dependency, info.block->hash () };
+	if (!exists (transaction_a, key))
+	{
+		auto status = store.put (transaction_a, tables::unchecked, key, info);
+		store.release_assert_success (status);
+	}
+	else
+	{
+		++dup;
+	}
 }
 
 bool nano::lmdb::unchecked_store::exists (nano::transaction const & transaction_a, nano::unchecked_key const & key)

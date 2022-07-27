@@ -52,6 +52,7 @@ public:
 public: // Trigger requested dependencies
 	void trigger (nano::hash_or_account const & dependency);
 	std::function<void (nano::unchecked_info const &)> satisfied{ [] (nano::unchecked_info const &) {} };
+	std::atomic<int> satisfied_total{ 0 };
 
 private:
 	using insert = std::pair<nano::hash_or_account, nano::unchecked_info>;

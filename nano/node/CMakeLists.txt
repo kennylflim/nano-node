@@ -22,6 +22,8 @@ add_library(
   blockprocessor.cpp
   bootstrap/block_deserializer.hpp
   bootstrap/block_deserializer.cpp
+  bootstrap/bootstrap_ascending.hpp
+  bootstrap/bootstrap_ascending.cpp
   bootstrap/bootstrap_attempt.hpp
   bootstrap/bootstrap_attempt.cpp
   bootstrap/bootstrap_bulk_pull.hpp
@@ -35,7 +37,6 @@ add_library(
   bootstrap/bootstrap_lazy.hpp
   bootstrap/bootstrap_lazy.cpp
   bootstrap/bootstrap_legacy.hpp
-  bootstrap/bootstrap_legacy.cpp
   bootstrap/bootstrap_server.hpp
   bootstrap/bootstrap_server.cpp
   bootstrap/bootstrap.hpp

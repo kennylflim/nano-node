@@ -885,7 +885,7 @@ TEST (websocket, bootstrap)
 	ASSERT_TIMELY (5s, !node1->bootstrap_initiator.in_progress ());
 }
 
-TEST (websocket, bootstrap_exited)
+TEST (websocket, DISABLED_bootstrap_exited)
 {
 	nano::system system;
 	nano::node_config config (nano::get_available_port (), system.logging);

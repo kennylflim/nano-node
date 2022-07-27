@@ -2,3 +2,5 @@ race:mdb.c
 race:rocksdb
 race:Rijndael::Base::FillEncTable
 race:Rijndael::Base::FillDecTable
+race:ios_base::width
+race:boost::asio::strand

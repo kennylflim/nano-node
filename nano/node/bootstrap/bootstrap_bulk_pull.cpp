@@ -348,7 +348,7 @@ void nano::bulk_pull_server::set_current_end ()
 			connection->node->logger.try_log (boost::str (boost::format ("Bulk pull request for block hash: %1%") % request->start.to_string ()));
 		}
 
-		current = request->start.as_block_hash ();
+		current = ascending () ? connection->node->store.block.successor (transaction, request->start.as_block_hash ()) : request->start.as_block_hash ();
 		include_start = true;
 	}
 	else
@@ -542,6 +542,7 @@ nano::bulk_pull_server::bulk_pull_server (std::shared_ptr<nano::bootstrap_server
 	connection (connection_a),
 	request (std::move (request_a))
 {
+	//std::cerr << "serving: " << request->start.to_account () << " from: " << connection->node->network.endpoint() << std::endl;
 	set_current_end ();
 }
 

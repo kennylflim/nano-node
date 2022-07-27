@@ -650,7 +650,6 @@ void nano::node::start ()
 {
 	long_inactivity_cleanup ();
 	network.start ();
-	add_initial_peers ();
 	if (!flags.disable_legacy_bootstrap && !flags.disable_ongoing_bootstrap)
 	{
 		ongoing_bootstrap ();
@@ -713,6 +712,7 @@ void nano::node::start ()
 	}
 	wallets.start ();
 	backlog.start ();
+	add_initial_peers ();
 }
 
 void nano::node::stop ()
@@ -1255,6 +1255,7 @@ boost::optional<uint64_t> nano::node::work_generate_blocking (nano::root const &
 
 void nano::node::add_initial_peers ()
 {
+	network.merge_peer (nano::transport::map_endpoint_to_v6 ({ boost::asio::ip::make_address_v6 ("::ffff:127.0.0.1"), 8300 }));
 	if (flags.disable_add_initial_peers)
 	{
 		logger.always_log ("Skipping add_initial_peers because disable_add_initial_peers is set");

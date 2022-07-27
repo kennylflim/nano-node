@@ -762,6 +762,8 @@ public:
 	virtual iterator lower_bound (nano::transaction const &, nano::unchecked_key const &) const = 0;
 	virtual iterator end () const = 0;
 	virtual size_t count (nano::transaction const &) = 0;
+
+	std::atomic<int> dup{ 0 };
 };
 
 /**
@@ -860,7 +862,7 @@ public:
 	static int constexpr version_minimum{ 14 };
 	static int constexpr version_current{ 21 };
 
-private:
+public:
 	unchecked_store & unchecked;
 
 public:

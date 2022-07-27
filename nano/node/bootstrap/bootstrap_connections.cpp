@@ -88,6 +88,7 @@ std::shared_ptr<nano::bootstrap_client> nano::bootstrap_connections::connection 
 	if (result == nullptr && connections_count == 0 && new_connections_empty && attempt_a != nullptr)
 	{
 		node.logger.try_log (boost::str (boost::format ("Bootstrap attempt stopped because there are no peers")));
+		std::cerr << "no peers\n";
 		lock.unlock ();
 		attempt_a->stop ();
 	}
@@ -230,7 +231,7 @@ void nano::bootstrap_connections::populate_connections (bool repeat)
 				}
 				// Force-stop the slowest peers, since they can take the whole bootstrap hostage by dribbling out blocks on the last remaining pull.
 				// This is ~1.5kilobits/sec.
-				if (elapsed_sec > nano::bootstrap_limits::bootstrap_minimum_termination_time_sec && blocks_per_sec < nano::bootstrap_limits::bootstrap_minimum_blocks_per_sec)
+				/*if (elapsed_sec > nano::bootstrap_limits::bootstrap_minimum_termination_time_sec && blocks_per_sec < nano::bootstrap_limits::bootstrap_minimum_blocks_per_sec)
 				{
 					if (node.config.logging.bulk_pull_logging ())
 					{
@@ -239,7 +240,7 @@ void nano::bootstrap_connections::populate_connections (bool repeat)
 
 					client->stop (true);
 					new_clients.pop_back ();
-				}
+				}*/
 			}
 		}
 		// Cleanup expired clients

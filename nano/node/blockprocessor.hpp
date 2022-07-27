@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/utility.hpp>
 #include <nano/node/state_block_signature_verification.hpp>
 #include <nano/secure/common.hpp>
 
@@ -65,10 +66,16 @@ public:
 	void process_blocks ();
 	nano::process_return process_one (nano::write_transaction const &, block_post_events &, nano::unchecked_info, bool const = false, nano::block_origin const = nano::block_origin::remote);
 	nano::process_return process_one (nano::write_transaction const &, block_post_events &, std::shared_ptr<nano::block> const &);
+	void dump_result_hist ();
+	std::atomic<uint64_t> processed_count{ 0 };
+	std::atomic<uint64_t> gap_previous_count{ 0 };
+	std::atomic<uint64_t> gap_source_count{ 0 };
 	std::atomic<bool> flushing{ false };
 	// Delay required for average network propagartion before requesting confirmation
 	static std::chrono::milliseconds constexpr confirmation_request_delay{ 1500 };
 	nano::observer_set<nano::transaction const &, nano::process_return const &, nano::block const &> processed;
+	std::mutex hist_mutex;
+	std::unordered_map<nano::block_hash, int> process_history;
 
 private:
 	void queue_unchecked (nano::write_transaction const &, nano::hash_or_account const &);
@@ -87,6 +94,7 @@ private:
 	nano::write_database_queue & write_database_queue;
 	nano::mutex mutex{ mutex_identifier (mutexes::block_processor) };
 	nano::state_block_signature_verification state_block_signature_verification;
+	std::unordered_map<nano::process_result, int> result_hist;
 	std::thread processing_thread;
 
 	friend std::unique_ptr<container_info_component> collect_container_info (block_processor & block_processor, std::string const & name);

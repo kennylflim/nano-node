@@ -10,7 +10,7 @@
 
 using namespace std::chrono_literals;
 
-TEST (block_processor, broadcast_block_on_arrival)
+TEST (block_processor, DISABLED_broadcast_block_on_arrival)
 {
 	nano::system system;
 	nano::node_config config1{ nano::get_available_port (), system.logging };
