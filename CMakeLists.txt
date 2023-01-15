@@ -451,7 +451,8 @@ target_link_libraries(boost_property_tree INTERFACE Boost::multi_index)
 
 # diskhash
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  add_library(diskhash STATIC ${CMAKE_SOURCE_DIR}/submodules/diskhash/src/diskhash.c)
+  add_library(diskhash STATIC
+              ${CMAKE_SOURCE_DIR}/submodules/diskhash/src/diskhash.c)
   include_directories(submodules/diskhash/src)
 endif()
 
@@ -527,7 +528,8 @@ elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64"
 endif()
 # Some Clang cannot handle mixed asm with positional arguments, where the body
 # is Intel style with no prefix and the templates are AT&T style. See:
-# submodules/cryptopp/config.h Also see https://bugs.llvm.org/show_bug.cgi?id=39895
+# submodules/cryptopp/config.h Also see
+# https://bugs.llvm.org/show_bug.cgi?id=39895
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_definitions(-DCRYPTOPP_DISABLE_MIXED_ASM -DCRYPTOPP_DISABLE_ASM)
   message(
@@ -602,8 +604,11 @@ target_include_directories(argon2 PUBLIC submodules/phc-winner-argon2/include)
 target_include_directories(argon2 PUBLIC submodules/phc-winner-argon2/src)
 target_include_directories(argon2 PUBLIC crypto/blake2)
 
-add_library(lmdb submodules/lmdb/libraries/liblmdb/lmdb.h submodules/lmdb/libraries/liblmdb/mdb.c
-                 submodules/lmdb/libraries/liblmdb/midl.c)
+add_library(
+  lmdb
+  submodules/lmdb/libraries/liblmdb/lmdb.h
+  submodules/lmdb/libraries/liblmdb/mdb.c
+  submodules/lmdb/libraries/liblmdb/midl.c)
 
 if(WIN32)
   target_link_libraries(lmdb ntdll)
