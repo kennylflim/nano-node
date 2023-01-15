@@ -662,13 +662,13 @@ if(NANO_TEST OR RAIBLOCKS_TEST)
 
   # FIXME: This fixes googletest GOOGLETEST_VERSION requirement
   set(GOOGLETEST_VERSION 1.11.0)
-  add_subdirectory(gtest/googletest)
+  add_subdirectory(submodules/gtest/googletest)
   # FIXME: This fixes gtest include directories without modifying gtest's
   # CMakeLists.txt. Ideally we should use GTest::GTest and GTest::Main as
   # dependencies but it requires building gtest differently
   set_target_properties(
     gtest PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
-                     "${CMAKE_SOURCE_DIR}/gtest/googletest/include")
+                     "${CMAKE_SOURCE_DIR}/submodules/gtest/googletest/include")
 
   add_subdirectory(nano/test_common)
   add_subdirectory(nano/core_test)
