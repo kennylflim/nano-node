@@ -8,7 +8,6 @@ namespace nano::stat
 /** Primary statistics type */
 enum class type : uint8_t
 {
-	traffic_udp,
 	traffic_tcp,
 	error,
 	message,
@@ -23,7 +22,6 @@ enum class type : uint8_t
 	peering,
 	ipc,
 	tcp,
-	udp,
 	confirmation_height,
 	confirmation_observer,
 	drop,
@@ -40,9 +38,11 @@ enum class type : uint8_t
 	active_started,
 	active_confirmed,
 	active_dropped,
+	active_timeout,
 	backlog,
+	unchecked,
+	election_scheduler,
 	optimistic,
-	scheduler,
 
 	_last // Must be the last enum
 };
@@ -147,18 +147,10 @@ enum class detail : uint8_t
 	vote_cached,
 	late_block,
 	late_block_seconds,
-	election_start,
-	election_confirmed_all,
 	election_block_conflict,
-	election_difficulty_update,
-	election_drop_expired,
-	election_drop_overflow,
-	election_drop_all,
 	election_restart,
-	election_confirmed,
 	election_not_confirmed,
 	election_hinted_overflow,
-	election_hinted_started,
 	election_hinted_confirmed,
 	election_hinted_drop,
 	generate_vote,
@@ -170,9 +162,7 @@ enum class detail : uint8_t
 	hinted,
 	optimistic,
 
-	// udp
-	blocking,
-	overflow,
+	// received messages
 	invalid_header,
 	invalid_message_type,
 	invalid_keepalive_message,
@@ -189,8 +179,6 @@ enum class detail : uint8_t
 	invalid_asc_pull_ack_message,
 	message_too_big,
 	outdated_version,
-	udp_max_per_ip,
-	udp_max_per_subnetwork,
 
 	// tcp
 	tcp_accept_success,
@@ -274,11 +262,15 @@ enum class detail : uint8_t
 	insert,
 	insert_failed,
 
+	// unchecked
+	put,
+	satisfied,
+	trigger,
+
 	// election scheduler
 	insert_manual,
 	insert_priority,
-	insert_priority_failed,
-	insert_priority_exists,
+	insert_priority_success,
 	erase_oldest,
 
 	_last // Must be the last enum
