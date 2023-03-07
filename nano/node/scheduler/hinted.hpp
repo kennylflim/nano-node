@@ -41,6 +41,7 @@ public:
 	 * Notify about changes in AEC vacancy
 	 */
 	void notify ();
+	size_t limit () const;
 
 private:
 	bool predicate (nano::uint128_t const & minimum_tally) const;
@@ -52,7 +53,7 @@ private:
 private: // Dependencies
 	nano::node & node;
 	nano::vote_cache & inactive_vote_cache;
-	nano::active_transactions & active;
+	std::shared_ptr<nano::scheduler::limiter> limiter;
 	nano::online_reps & online_reps;
 	nano::stats & stats;
 

@@ -2,6 +2,7 @@
 #include <nano/node/election.hpp>
 #include <nano/node/scheduler/buckets.hpp>
 #include <nano/node/scheduler/component.hpp>
+#include <nano/node/scheduler/hinted.hpp>
 #include <nano/node/transport/inproc.hpp>
 #include <nano/test_common/chains.hpp>
 #include <nano/test_common/system.hpp>
@@ -1520,9 +1521,9 @@ TEST (active_transactions, allow_limited_overflow)
 	}
 
 	// Ensure active elections overfill AEC only up to normal + hinted limit
-	ASSERT_TIMELY_EQ (5s, node.active.size (), node.active.limit () + node.active.limit (nano::election_behavior::hinted));
+	ASSERT_TIMELY_EQ (5s, node.active.size (), node.active.limit () + node.scheduler.hinted.limit ());
 	// And it stays that way without increasing
-	ASSERT_ALWAYS (1s, node.active.size () == node.active.limit () + node.active.limit (nano::election_behavior::hinted));
+	ASSERT_ALWAYS (1s, node.active.size () == node.active.limit () + node.scheduler.hinted.limit ());
 }
 
 /*
@@ -1558,9 +1559,9 @@ TEST (active_transactions, allow_limited_overflow_adapt)
 	}
 
 	// Ensure hinted election amount is bounded by hinted limit
-	ASSERT_TIMELY_EQ (5s, node.active.size (), node.active.limit (nano::election_behavior::hinted));
+	ASSERT_TIMELY_EQ (5s, node.active.size (), node.scheduler.hinted.limit ());
 	// And it stays that way without increasing
-	ASSERT_ALWAYS (1s, node.active.size () == node.active.limit (nano::election_behavior::hinted));
+	ASSERT_ALWAYS (1s, node.active.size () == node.scheduler.hinted.limit ());
 
 	// Insert the first part of the blocks into normal election scheduler
 	for (auto const & block : blocks1)

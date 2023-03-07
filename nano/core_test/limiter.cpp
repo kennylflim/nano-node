@@ -8,7 +8,7 @@
 TEST (election_occupancy, construction)
 {
 	nano::test::system system{ 1 };
-	auto occupancy = std::make_shared<nano::election_occupancy> (system.nodes[0]->active, 0, nano::election_behavior::normal);
+	auto occupancy = std::make_shared<nano::scheduler::limiter> (system.nodes[0]->active, 0, nano::election_behavior::normal);
 	ASSERT_EQ (0, occupancy->limit ());
 	ASSERT_FALSE (occupancy->available ());
 }
@@ -16,7 +16,7 @@ TEST (election_occupancy, construction)
 TEST (election_occupancy, limit)
 {
 	nano::test::system system{ 1 };
-	auto occupancy = std::make_shared<nano::election_occupancy> (system.nodes[0]->active, 1, nano::election_behavior::normal);
+	auto occupancy = std::make_shared<nano::scheduler::limiter> (system.nodes[0]->active, 1, nano::election_behavior::normal);
 	ASSERT_EQ (1, occupancy->limit ());
 	ASSERT_TRUE (occupancy->available ());
 }
@@ -24,7 +24,7 @@ TEST (election_occupancy, limit)
 TEST (election_occupancy, activate)
 {
 	nano::test::system system{ 1 };
-	auto occupancy = std::make_shared<nano::election_occupancy> (system.nodes[0]->active, 1, nano::election_behavior::normal);
+	auto occupancy = std::make_shared<nano::scheduler::limiter> (system.nodes[0]->active, 1, nano::election_behavior::normal);
 	auto result = occupancy->activate (nano::dev::genesis);
 	ASSERT_TRUE (result.inserted);
 	auto elections = occupancy->elections ();

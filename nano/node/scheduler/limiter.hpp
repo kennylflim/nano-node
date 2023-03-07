@@ -15,13 +15,15 @@ class block;
 class election;
 enum class election_behavior;
 class stats;
+namespace scheduler
+{
 /**
 	This class is a facade around active_transactions that limits the number of elections that can be inserted.
 */
-class election_occupancy : public std::enable_shared_from_this<election_occupancy>
+class limiter : public std::enable_shared_from_this<limiter>
 {
 public:
-	election_occupancy (nano::active_transactions & active, size_t limit, nano::election_behavior behavior);
+	limiter (nano::active_transactions & active, size_t limit, nano::election_behavior behavior);
 	// Checks whether there is availability to insert an election for 'block' and if so, spawns a new election
 	nano::election_insertion_result activate (std::shared_ptr<nano::block> const & block);
 	// Returns whether there is availability to insert a new election
@@ -42,4 +44,5 @@ private:
 
 	mutable nano::mutex mutex;
 };
+} // namespace scheduler
 } // namespace nano
