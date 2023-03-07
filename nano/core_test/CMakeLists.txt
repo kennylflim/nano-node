@@ -26,6 +26,7 @@ add_executable(
   ipc.cpp
   ledger.cpp
   ledger_walker.cpp
+  limiter.cpp
   locks.cpp
   logger.cpp
   message.cpp
