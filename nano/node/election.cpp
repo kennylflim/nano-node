@@ -39,7 +39,8 @@ void nano::election::confirm_once (nano::unique_lock<nano::mutex> & lock_a, nano
 	nano::unique_lock<nano::mutex> election_winners_lk{ node.active.election_winner_details_mutex };
 	if (state_m.exchange (nano::election::state_t::confirmed) != nano::election::state_t::confirmed && (node.active.election_winner_details.count (status.winner->hash ()) == 0))
 	{
-		node.active.election_winner_details.emplace (status.winner->hash (), shared_from_this ());
+		auto hash = status.winner->hash ();
+		node.active.election_winner_details.emplace (hash, shared_from_this ());
 		election_winners_lk.unlock ();
 		status.election_end = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ());
 		status.election_duration = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::steady_clock::now () - election_start);
@@ -48,6 +49,7 @@ void nano::election::confirm_once (nano::unique_lock<nano::mutex> & lock_a, nano
 		status.voter_count = nano::narrow_cast<decltype (status.voter_count)> (last_votes.size ());
 		status.type = type_a;
 		auto const status_l = status;
+		node.active.recently_confirmed.put (status.winner->qualified_root (), hash);
 		lock_a.unlock ();
 
 		node.background ([node_l = node.shared (), status_l, confirmation_action_l = confirmation_action] () {

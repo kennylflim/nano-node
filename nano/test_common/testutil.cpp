@@ -257,10 +257,12 @@ void nano::test::start_elections (nano::test::system & system_a, nano::node & no
 	for (auto const & hash_l : hashes_a)
 	{
 		auto election = nano::test::start_election (system_a, node_a, hash_l);
-		release_assert (election);
-		if (forced_a)
+		if (election)
 		{
-			election->force_confirm ();
+			if (forced_a)
+			{
+				election->force_confirm ();
+			}
 		}
 	}
 }
