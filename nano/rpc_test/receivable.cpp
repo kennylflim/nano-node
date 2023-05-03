@@ -527,13 +527,15 @@ TEST (rpc, accounts_receivable_confirmed)
 	auto node = add_ipc_enabled_node (system);
 	auto chain = nano::test::setup_chain (system, *node, 1, nano::dev::genesis_key, false);
 	auto block1 = chain[0];
+	auto destination = block1->link ().as_account ();
+	ASSERT_FALSE (destination.is_zero ());
 
 	auto const rpc_ctx = add_rpc (system, node);
 	boost::property_tree::ptree request;
 	request.put ("action", "accounts_receivable");
 	boost::property_tree::ptree entry;
 	boost::property_tree::ptree peers_l;
-	entry.put ("", block1->link ().to_account ());
+	entry.put ("", destination.to_account ());
 	peers_l.push_back (std::make_pair ("", entry));
 	request.add_child ("accounts", peers_l);
 
@@ -541,6 +543,12 @@ TEST (rpc, accounts_receivable_confirmed)
 	request.put ("include_only_confirmed", "true");
 	ASSERT_TRUE (check_block_response_count (system, rpc_ctx, request, 0));
 	request.put ("include_only_confirmed", "false");
+	{
+		std::stringstream ss;
+		boost::property_tree::json_parser::write_json (ss, request);
+		auto exists2 = node->store.pending.exists (node->store.tx_begin_read (), nano::pending_key (destination, block1->hash ()));
+		std::cerr << ss.str () << ' ' << exists2 << '\n';
+	}
 	ASSERT_TRUE (check_block_response_count (system, rpc_ctx, request, 1));
 	{
 		node->store.confirmation_height.put (node->store.tx_begin_write (), nano::dev::genesis_key.pub, { 2, block1->hash () });
