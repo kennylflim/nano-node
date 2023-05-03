@@ -9,7 +9,7 @@ using namespace std::chrono;
 
 std::chrono::milliseconds nano::election::base_latency () const
 {
-	return node.network_params.network.is_dev_network () ? 25ms : 1000ms;
+	return 1000ms;
 }
 
 nano::election_vote_result::election_vote_result (bool replay_a, bool processed_a)
