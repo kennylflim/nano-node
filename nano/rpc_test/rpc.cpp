@@ -3264,8 +3264,6 @@ TEST (rpc, pending_exists)
 		std::cerr << ss.str () << '\n';
 	}
 	ASSERT_TRUE (pending_exists ("1"));
-
-	ASSERT_TRUE (pending_exists ("1"));
 	reset_confirmation_height (node->store, block1->account ());
 	ASSERT_TRUE (pending_exists ("0"));
 	request.put ("include_only_confirmed", "false");

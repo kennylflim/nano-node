@@ -3133,9 +3133,15 @@ void nano::json_handler::pending_exists ()
 
 void nano::json_handler::receivable_exists ()
 {
+	{
+		std::stringstream ss;
+		boost::property_tree::json_parser::write_json (ss, request);
+		std::cerr << ss.str () << '\n';
+	}
 	auto hash (hash_impl ());
 	bool const include_active = request.get<bool> ("include_active", false);
 	bool const include_only_confirmed = request.get<bool> ("include_only_confirmed", true);
+	std::cerr << include_active << ' ' << include_only_confirmed << '\n';
 	if (!ec)
 	{
 		auto transaction (node.store.tx_begin_read ());
