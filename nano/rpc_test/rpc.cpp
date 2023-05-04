@@ -3241,6 +3241,7 @@ TEST (rpc, pending_exists)
 	auto block1 (system.wallet (0)->send_action (nano::dev::genesis_key.pub, key1.pub, 100));
 	ASSERT_TIMELY (5s, node->store.pending.exists (node->store.tx_begin_read (), nano::pending_key (key1.pub, block1->hash ())));
 	ASSERT_TIMELY (5s, node->block_confirmed (block1->hash ()));
+	ASSERT_TIMELY (5s, !node->active.active (*block1));
 
 	auto const rpc_ctx = add_rpc (system, node);
 	boost::property_tree::ptree request;
