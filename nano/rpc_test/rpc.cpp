@@ -3249,7 +3249,7 @@ TEST (rpc, pending_exists)
 		auto response0 (wait_response (system, rpc_ctx, request));
 		std::string exists_text (response0.get<std::string> ("exists"));
 		auto exists2 = node->store.pending.exists (node->store.tx_begin_read (), nano::pending_key (key1.pub, block1->hash ()));
-		std::cerr << exists_text << ' ' << exists2 << '\n';
+		std::cerr << "test check: " << exists_text << ' ' << exists2 << '\n';
 		return exists_a == exists_text;
 	};
 

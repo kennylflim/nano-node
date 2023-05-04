@@ -3136,7 +3136,7 @@ void nano::json_handler::receivable_exists ()
 	{
 		std::stringstream ss;
 		boost::property_tree::json_parser::write_json (ss, request);
-		std::cerr << ss.str () << '\n';
+		std::cerr << "receivable_exists: " << ss.str () << '\n';
 	}
 	auto hash (hash_impl ());
 	bool const include_active = request.get<bool> ("include_active", false);
