@@ -29,11 +29,18 @@ class active_transactions;
 
 namespace nano::scheduler
 {
+class limiter;
 class optimistic_config final
 {
 public:
 	nano::error deserialize (nano::tomlconfig & toml);
 	nano::error serialize (nano::tomlconfig & toml) const;
+
+	class optimistic_config final
+	{
+	public:
+		nano::error deserialize (nano::tomlconfig & toml);
+		nano::error serialize (nano::tomlconfig & toml) const;
 
 public:
 	bool enabled{ true };
@@ -51,6 +58,9 @@ class optimistic final
 public:
 	optimistic (optimistic_config const &, nano::node &, nano::ledger &, nano::active_transactions &, nano::network_constants const & network_constants, nano::stats &);
 	~optimistic ();
+	public:
+		optimistic (optimistic_config const &, nano::node &, nano::ledger &, nano::network_constants const & network_constants, nano::stats &);
+		~optimistic ();
 
 	void start ();
 	void stop ();
@@ -63,31 +73,31 @@ public:
 	/**
 	 * Notify about changes in AEC vacancy
 	 */
-	void notify ();
+		void notify ();
 
-private:
-	bool activate_predicate (nano::account_info const &, nano::confirmation_height_info const &) const;
+	private:
+		bool activate_predicate (nano::account_info const &, nano::confirmation_height_info const &) const;
 
-	bool predicate () const;
-	void run ();
-	void run_one (nano::transaction const &, entry const & candidate);
+		bool predicate () const;
+		void run ();
+		void run_one (nano::transaction const &, entry const & candidate);
 
-private: // Dependencies
-	optimistic_config const & config;
-	nano::node & node;
-	nano::ledger & ledger;
-	nano::active_transactions & active;
-	nano::network_constants const & network_constants;
-	nano::stats & stats;
+	private: // Dependencies
+		optimistic_config const & config;
+		nano::node & node;
+		nano::ledger & ledger;
+		std::shared_ptr<nano::scheduler::limiter> limiter;
+		nano::network_constants const & network_constants;
+		nano::stats & stats;
 
-private:
-	struct entry
-	{
-		nano::account account;
-		nano::clock::time_point timestamp;
-	};
+	private:
+		struct entry
+		{
+			nano::account account;
+			nano::clock::time_point timestamp;
+		};
 
-	// clang-format off
+		// clang-format off
 	class tag_sequenced {};
 	class tag_account {};
 
