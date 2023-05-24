@@ -8,7 +8,7 @@ nano::scheduler::optimistic::optimistic (optimistic_config const & config_a, nan
 	config{ config_a },
 	node{ node_a },
 	ledger{ ledger_a },
-	limiter{ std::make_shared <nano::scheduler::limiter> (node.active, node.config.active_elections_optimistic_limit_percentage * node.config.active_elections_size / 100, nano::election_behavior::optimistic) },
+	limiter{ std::make_shared<nano::scheduler::limiter> (node.active, node.config.active_elections_optimistic_limit_percentage * node.config.active_elections_size / 100, nano::election_behavior::optimistic) },
 	network_constants{ network_constants_a },
 	stats{ stats_a }
 {

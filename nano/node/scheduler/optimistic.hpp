@@ -42,35 +42,36 @@ public:
 		nano::error deserialize (nano::tomlconfig & toml);
 		nano::error serialize (nano::tomlconfig & toml) const;
 
-public:
-	bool enabled{ true };
+	public:
+		bool enabled{ true };
 
-	/** Minimum difference between confirmation frontier and account frontier to become a candidate for optimistic confirmation */
-	std::size_t gap_threshold{ 32 };
+		/** Minimum difference between confirmation frontier and account frontier to become a candidate for optimistic confirmation */
+		std::size_t gap_threshold{ 32 };
 
-	/** Maximum number of candidates stored in memory */
-	std::size_t max_size{ 1024 * 64 };
-};
-class optimistic final
-{
-	struct entry;
+		/** Maximum number of candidates stored in memory */
+		std::size_t max_size{ 1024 * 64 };
+	};
+	class optimistic final
+	{
+		struct entry;
 
-public:
-	optimistic (optimistic_config const &, nano::node &, nano::ledger &, nano::active_transactions &, nano::network_constants const & network_constants, nano::stats &);
-	~optimistic ();
+	public:
+		optimistic (optimistic_config const &, nano::node &, nano::ledger &, nano::active_transactions &, nano::network_constants const & network_constants, nano::stats &);
+		~optimistic ();
+
 	public:
 		optimistic (optimistic_config const &, nano::node &, nano::ledger &, nano::network_constants const & network_constants, nano::stats &);
 		~optimistic ();
 
-	void start ();
-	void stop ();
+		void start ();
+		void stop ();
 
-	/**
+		/**
 	 * Called from backlog population to process accounts with unconfirmed blocks
 	 */
-	bool activate (nano::account const &, nano::account_info const &, nano::confirmation_height_info const &);
+		bool activate (nano::account const &, nano::account_info const &, nano::confirmation_height_info const &);
 
-	/**
+		/**
 	 * Notify about changes in AEC vacancy
 	 */
 		void notify ();
@@ -107,14 +108,14 @@ public:
 		mi::hashed_unique<mi::tag<tag_account>,
 			mi::member<entry, nano::account, &entry::account>>
 	>>;
-	// clang-format on
+		// clang-format on
 
-	/** Accounts eligible for optimistic scheduling */
-	ordered_candidates candidates;
+		/** Accounts eligible for optimistic scheduling */
+		ordered_candidates candidates;
 
-	bool stopped{ false };
-	nano::condition_variable condition;
-	mutable nano::mutex mutex;
-	std::thread thread;
-};
+		bool stopped{ false };
+		nano::condition_variable condition;
+		mutable nano::mutex mutex;
+		std::thread thread;
+	};
 }
