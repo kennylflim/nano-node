@@ -17,6 +17,7 @@ class online_reps;
 }
 namespace nano::scheduler
 {
+class limiter;
 /*
  * Monitors inactive vote cache and schedules elections with the highest observed vote tally.
  */
