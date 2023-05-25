@@ -16,7 +16,6 @@ class stats;
 
 namespace nano::scheduler
 {
-
 /** A container for holding blocks and their arrival/creation time.
  *
  *  The container consists of a number of buckets. Each bucket holds an ordered set of 'value_type' items.
@@ -45,7 +44,7 @@ class prioritization final
 	};
 
 	nano::stats & stats;
-	std::function<nano::election_insertion_result(std::shared_ptr<nano::block>)> activate_m;
+	std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate_m;
 
 	/** container for the buckets to be read in round robin fashion */
 	std::vector<bucket> buckets;
@@ -68,7 +67,7 @@ class prioritization final
 	void populate_schedule ();
 
 public:
-	prioritization (nano::stats & stats, uint64_t maximum = 250000u, std::function<nano::election_insertion_result(std::shared_ptr<nano::block>)> activate = nullptr);
+	prioritization (nano::stats & stats, uint64_t maximum = 250000u, std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate = nullptr);
 	void push (uint64_t time, std::shared_ptr<nano::block> block, nano::amount const & priority);
 	void activate ();
 	std::size_t size () const;

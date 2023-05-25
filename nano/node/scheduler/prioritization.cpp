@@ -49,9 +49,9 @@ void nano::scheduler::prioritization::populate_schedule ()
  * Prioritization constructor, construct a container containing approximately 'maximum' number of blocks.
  * @param maximum number of blocks that this container can hold, this is a soft and approximate limit.
  */
-nano::scheduler::prioritization::prioritization (nano::stats & stats, uint64_t maximum, std::function<nano::election_insertion_result(std::shared_ptr<nano::block>)> activate) :
+nano::scheduler::prioritization::prioritization (nano::stats & stats, uint64_t maximum, std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate) :
 	stats{ stats },
-	activate_m { activate },
+	activate_m{ activate },
 	maximum{ maximum }
 {
 	auto build_region = [this] (uint128_t const & begin, uint128_t const & end, size_t count) {
