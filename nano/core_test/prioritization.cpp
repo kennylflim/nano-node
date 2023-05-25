@@ -1,4 +1,4 @@
-#include <nano/node/prioritization.hpp>
+#include <nano/node/scheduler/prioritization.hpp>
 #include <nano/secure/common.hpp>
 
 #include <gtest/gtest.h>
@@ -108,7 +108,7 @@ std::shared_ptr<nano::state_block> & block3 ()
 
 TEST (prioritization, construction)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	ASSERT_EQ (0, prioritization.size ());
 	ASSERT_TRUE (prioritization.empty ());
 	ASSERT_EQ (62, prioritization.bucket_count ());
@@ -116,19 +116,19 @@ TEST (prioritization, construction)
 
 TEST (prioritization, index_min)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	ASSERT_EQ (0, prioritization.index (std::numeric_limits<nano::uint128_t>::min ()));
 }
 
 TEST (prioritization, index_max)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	ASSERT_EQ (prioritization.bucket_count () - 1, prioritization.index (std::numeric_limits<nano::uint128_t>::max ()));
 }
 
 TEST (prioritization, insert_Gxrb)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	ASSERT_EQ (1, prioritization.size ());
 	ASSERT_EQ (1, prioritization.bucket_size (48));
@@ -136,7 +136,7 @@ TEST (prioritization, insert_Gxrb)
 
 TEST (prioritization, insert_Mxrb)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block1 (), nano::Mxrb_ratio);
 	ASSERT_EQ (1, prioritization.size ());
 	ASSERT_EQ (1, prioritization.bucket_size (13));
@@ -145,7 +145,7 @@ TEST (prioritization, insert_Mxrb)
 // Test two blocks with the same priority
 TEST (prioritization, insert_same_priority)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	prioritization.push (1000, block2 (), nano::Gxrb_ratio);
 	ASSERT_EQ (2, prioritization.size ());
@@ -155,7 +155,7 @@ TEST (prioritization, insert_same_priority)
 // Test the same block inserted multiple times
 TEST (prioritization, insert_duplicate)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	ASSERT_EQ (1, prioritization.size ());
@@ -164,7 +164,7 @@ TEST (prioritization, insert_duplicate)
 
 TEST (prioritization, insert_older)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	prioritization.push (1100, block2 (), nano::Gxrb_ratio);
 	ASSERT_EQ (block0 (), prioritization.top ());
@@ -175,7 +175,7 @@ TEST (prioritization, insert_older)
 
 TEST (prioritization, pop)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	ASSERT_TRUE (prioritization.empty ());
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	ASSERT_FALSE (prioritization.empty ());
@@ -185,14 +185,14 @@ TEST (prioritization, pop)
 
 TEST (prioritization, top_one)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	ASSERT_EQ (block0 (), prioritization.top ());
 }
 
 TEST (prioritization, top_two)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	prioritization.push (1, block1 (), nano::Mxrb_ratio);
 	ASSERT_EQ (block0 (), prioritization.top ());
@@ -204,7 +204,7 @@ TEST (prioritization, top_two)
 
 TEST (prioritization, top_round_robin)
 {
-	nano::prioritization prioritization;
+	nano::scheduler::prioritization prioritization;
 	prioritization.push (1000, blockzero (), 0);
 	ASSERT_EQ (blockzero (), prioritization.top ());
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
@@ -222,7 +222,7 @@ TEST (prioritization, top_round_robin)
 
 TEST (prioritization, trim_normal)
 {
-	nano::prioritization prioritization{ 1 };
+	nano::scheduler::prioritization prioritization{ 1 };
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	prioritization.push (1100, block2 (), nano::Gxrb_ratio);
 	ASSERT_EQ (1, prioritization.size ());
@@ -231,7 +231,7 @@ TEST (prioritization, trim_normal)
 
 TEST (prioritization, trim_reverse)
 {
-	nano::prioritization prioritization{ 1 };
+	nano::scheduler::prioritization prioritization{ 1 };
 	prioritization.push (1100, block2 (), nano::Gxrb_ratio);
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	ASSERT_EQ (1, prioritization.size ());
@@ -240,7 +240,7 @@ TEST (prioritization, trim_reverse)
 
 TEST (prioritization, trim_even)
 {
-	nano::prioritization prioritization{ 2 };
+	nano::scheduler::prioritization prioritization{ 2 };
 	prioritization.push (1000, block0 (), nano::Gxrb_ratio);
 	prioritization.push (1100, block2 (), nano::Gxrb_ratio);
 	ASSERT_EQ (1, prioritization.size ());

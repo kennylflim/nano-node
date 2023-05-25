@@ -163,8 +163,6 @@ add_library(
   peer_exclusion.cpp
   portmapping.hpp
   portmapping.cpp
-  prioritization.cpp
-  prioritization.hpp
   process_live_dispatcher.cpp
   process_live_dispatcher.hpp
   repcrawler.hpp
@@ -206,6 +204,8 @@ add_library(
   scheduler/limiter.cpp
   scheduler/optimistic.hpp
   scheduler/optimistic.cpp
+  scheduler/prioritization.cpp
+  scheduler/prioritization.hpp
   signatures.hpp
   signatures.cpp
   state_block_signature_verification.hpp

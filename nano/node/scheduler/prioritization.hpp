@@ -9,6 +9,10 @@
 namespace nano
 {
 class block;
+}
+
+namespace nano::scheduler
+{
 
 /** A container for holding blocks and their arrival/creation time.
  *

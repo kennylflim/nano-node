@@ -1,21 +1,21 @@
 #include <nano/lib/blocks.hpp>
 #include <nano/lib/utility.hpp>
-#include <nano/node/prioritization.hpp>
+#include <nano/node/scheduler/prioritization.hpp>
 
 #include <string>
 
-bool nano::prioritization::value_type::operator< (value_type const & other_a) const
+bool nano::scheduler::prioritization::value_type::operator< (value_type const & other_a) const
 {
 	return time < other_a.time || (time == other_a.time && block->hash () < other_a.block->hash ());
 }
 
-bool nano::prioritization::value_type::operator== (value_type const & other_a) const
+bool nano::scheduler::prioritization::value_type::operator== (value_type const & other_a) const
 {
 	return time == other_a.time && block->hash () == other_a.block->hash ();
 }
 
 /** Moves the bucket pointer to the next bucket */
-void nano::prioritization::next ()
+void nano::scheduler::prioritization::next ()
 {
 	++current;
 	if (current == schedule.end ())
@@ -25,7 +25,7 @@ void nano::prioritization::next ()
 }
 
 /** Seek to the next non-empty bucket, if one exists */
-void nano::prioritization::seek ()
+void nano::scheduler::prioritization::seek ()
 {
 	next ();
 	for (std::size_t i = 0, n = schedule.size (); buckets[*current].queue.empty () && i < n; ++i)
@@ -35,7 +35,7 @@ void nano::prioritization::seek ()
 }
 
 /** Initialise the schedule vector */
-void nano::prioritization::populate_schedule ()
+void nano::scheduler::prioritization::populate_schedule ()
 {
 	for (auto i = 0; i < buckets.size (); ++i)
 	{
@@ -47,7 +47,7 @@ void nano::prioritization::populate_schedule ()
  * Prioritization constructor, construct a container containing approximately 'maximum' number of blocks.
  * @param maximum number of blocks that this container can hold, this is a soft and approximate limit.
  */
-nano::prioritization::prioritization (uint64_t maximum) :
+nano::scheduler::prioritization::prioritization (uint64_t maximum) :
 	maximum{ maximum }
 {
 	auto build_region = [this] (uint128_t const & begin, uint128_t const & end, size_t count) {
@@ -72,7 +72,7 @@ nano::prioritization::prioritization (uint64_t maximum) :
 	current = schedule.begin ();
 }
 
-std::size_t nano::prioritization::index (nano::uint128_t const & balance) const
+std::size_t nano::scheduler::prioritization::index (nano::uint128_t const & balance) const
 {
 	auto index = std::upper_bound (minimums.begin (), minimums.end (), balance) - minimums.begin () - 1;
 	return index;
@@ -82,7 +82,7 @@ std::size_t nano::prioritization::index (nano::uint128_t const & balance) const
  * Push a block and its associated time into the prioritization container.
  * The time is given here because sideband might not exist in the case of state blocks.
  */
-void nano::prioritization::push (uint64_t time, std::shared_ptr<nano::block> block, nano::amount const & priority)
+void nano::scheduler::prioritization::push (uint64_t time, std::shared_ptr<nano::block> block, nano::amount const & priority)
 {
 	auto was_empty = empty ();
 	auto & bucket = buckets[index (priority.number ())];
@@ -98,7 +98,7 @@ void nano::prioritization::push (uint64_t time, std::shared_ptr<nano::block> blo
 }
 
 /** Return the highest priority block of the current bucket */
-std::shared_ptr<nano::block> nano::prioritization::top () const
+std::shared_ptr<nano::block> nano::scheduler::prioritization::top () const
 {
 	debug_assert (!empty ());
 	debug_assert (!buckets[*current].queue.empty ());
@@ -107,7 +107,7 @@ std::shared_ptr<nano::block> nano::prioritization::top () const
 }
 
 /** Pop the current block from the container and seek to the next block, if it exists */
-void nano::prioritization::pop ()
+void nano::scheduler::prioritization::pop ()
 {
 	debug_assert (!empty ());
 	debug_assert (!buckets[*current].queue.empty ());
@@ -117,7 +117,7 @@ void nano::prioritization::pop ()
 }
 
 /** Returns the total number of blocks in buckets */
-std::size_t nano::prioritization::size () const
+std::size_t nano::scheduler::prioritization::size () const
 {
 	std::size_t result{ 0 };
 	for (auto const & bucket : buckets)
@@ -128,29 +128,29 @@ std::size_t nano::prioritization::size () const
 }
 
 /** Returns number of buckets, 62 by default */
-std::size_t nano::prioritization::bucket_count () const
+std::size_t nano::scheduler::prioritization::bucket_count () const
 {
 	return buckets.size ();
 }
 
 /** Returns number of items in bucket with index 'index' */
-std::size_t nano::prioritization::bucket_size (std::size_t index) const
+std::size_t nano::scheduler::prioritization::bucket_size (std::size_t index) const
 {
 	return buckets[index].queue.size ();
 }
 
 /** Returns true if all buckets are empty */
-bool nano::prioritization::empty () const
+bool nano::scheduler::prioritization::empty () const
 {
 	return std::all_of (buckets.begin (), buckets.end (), [] (auto const & bucket_a) { return bucket_a.queue.empty (); });
 }
 
 /** Print the state of the class in stderr */
-void nano::prioritization::dump () const
+void nano::scheduler::prioritization::dump () const
 {
-	for (auto const & i : buckets)
+	for (auto const & bucket : buckets)
 	{
-		for (auto const & j : i.queue)
+		for (auto const & j : bucket.queue)
 		{
 			std::cerr << j.time << ' ' << j.block->hash ().to_string () << '\n';
 		}
@@ -158,7 +158,7 @@ void nano::prioritization::dump () const
 	std::cerr << "current: " << std::to_string (*current) << '\n';
 }
 
-std::unique_ptr<nano::container_info_component> nano::prioritization::collect_container_info (std::string const & name)
+std::unique_ptr<nano::container_info_component> nano::scheduler::prioritization::collect_container_info (std::string const & name)
 {
 	auto composite = std::make_unique<container_info_composite> (name);
 	for (auto i = 0; i < buckets.size (); ++i)
