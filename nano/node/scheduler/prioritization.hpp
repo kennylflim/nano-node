@@ -1,6 +1,7 @@
 #pragma once
 #include <nano/lib/numbers.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/node/election_insertion_result.hpp>
 
 #include <cstddef>
 #include <set>
@@ -9,6 +10,8 @@
 namespace nano
 {
 class block;
+class node;
+class stats;
 }
 
 namespace nano::scheduler
@@ -41,6 +44,9 @@ class prioritization final
 		std::set<value_type> queue;
 	};
 
+	nano::stats & stats;
+	std::function<nano::election_insertion_result(std::shared_ptr<nano::block>)> activate_m;
+
 	/** container for the buckets to be read in round robin fashion */
 	std::vector<bucket> buckets;
 
@@ -62,16 +68,17 @@ class prioritization final
 	void populate_schedule ();
 
 public:
-	prioritization (uint64_t maximum = 250000u);
+	prioritization (nano::stats & stats, uint64_t maximum = 250000u, std::function<nano::election_insertion_result(std::shared_ptr<nano::block>)> activate = nullptr);
 	void push (uint64_t time, std::shared_ptr<nano::block> block, nano::amount const & priority);
-	std::shared_ptr<nano::block> top () const;
-	void pop ();
+	void activate ();
 	std::size_t size () const;
 	std::size_t bucket_count () const;
 	std::size_t bucket_size (std::size_t index) const;
 	bool empty () const;
 	void dump () const;
 	std::size_t index (nano::uint128_t const & balance) const;
+	std::shared_ptr<nano::block> top () const;
+	void pop ();
 
 	std::unique_ptr<nano::container_info_component> collect_container_info (std::string const &);
 };

@@ -3,7 +3,11 @@
 
 nano::scheduler::buckets::buckets (nano::node & node_a, nano::stats & stats_a) :
 	node{ node_a },
-	stats{ stats_a }
+	stats{ stats_a },
+	activate_m{ [this] (auto const & block) {
+		return node.active.insert (block);
+	} },
+	priority{ stats_a, 250000u, activate_m }
 {
 }
 
@@ -137,19 +141,9 @@ void nano::scheduler::buckets::run ()
 			}
 			else if (priority_queue_predicate ())
 			{
-				auto block = priority.top ();
-				priority.pop ();
+				priority.activate ();
 				lock.unlock ();
 				stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::insert_priority);
-				auto result = node.active.insert (block);
-				if (result.inserted)
-				{
-					stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::insert_priority_success);
-				}
-				if (result.election != nullptr)
-				{
-					result.election->transition_active ();
-				}
 			}
 			else
 			{

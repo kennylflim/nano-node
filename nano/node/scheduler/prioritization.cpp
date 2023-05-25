@@ -1,5 +1,7 @@
 #include <nano/lib/blocks.hpp>
+#include <nano/lib/stats.hpp>
 #include <nano/lib/utility.hpp>
+#include <nano/node/election.hpp>
 #include <nano/node/scheduler/prioritization.hpp>
 
 #include <string>
@@ -47,7 +49,9 @@ void nano::scheduler::prioritization::populate_schedule ()
  * Prioritization constructor, construct a container containing approximately 'maximum' number of blocks.
  * @param maximum number of blocks that this container can hold, this is a soft and approximate limit.
  */
-nano::scheduler::prioritization::prioritization (uint64_t maximum) :
+nano::scheduler::prioritization::prioritization (nano::stats & stats, uint64_t maximum, std::function<nano::election_insertion_result(std::shared_ptr<nano::block>)> activate) :
+	stats{ stats },
+	activate_m { activate },
 	maximum{ maximum }
 {
 	auto build_region = [this] (uint128_t const & begin, uint128_t const & end, size_t count) {
@@ -114,6 +118,26 @@ void nano::scheduler::prioritization::pop ()
 	auto & bucket = buckets[*current];
 	bucket.queue.erase (bucket.queue.begin ());
 	seek ();
+}
+
+void nano::scheduler::prioritization::activate ()
+{
+	debug_assert (!empty ());
+	auto block = top ();
+	pop ();
+	if (!activate_m)
+	{
+		return;
+	}
+	auto result = activate_m (block);
+	if (result.inserted)
+	{
+		stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::insert_priority_success);
+	}
+	if (result.election != nullptr)
+	{
+		result.election->transition_active ();
+	}
 }
 
 /** Returns the total number of blocks in buckets */
