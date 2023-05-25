@@ -4,10 +4,9 @@
 nano::scheduler::buckets::buckets (nano::node & node_a, nano::stats & stats_a) :
 	node{ node_a },
 	stats{ stats_a },
-	activate_m{ [this] (auto const & block) {
-		return node.active.insert (block);
-	} },
-	priority{ stats_a, 250000u, activate_m }
+	priority{ stats_a, [this] (auto const & block) {
+				 return node.active.insert (block, nano::election_behavior::normal);
+			 } }
 {
 }
 

@@ -10,10 +10,8 @@
 
 namespace nano
 {
-class active_transactions;
 class block;
 class election;
-enum class election_behavior;
 class stats;
 }
 
@@ -25,7 +23,7 @@ This class is a facade around active_transactions that limits the number of elec
 class limiter : public std::enable_shared_from_this<limiter>
 {
 public:
-	limiter (nano::active_transactions & active, size_t limit, nano::election_behavior behavior);
+	limiter (std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate, size_t limit);
 	// Checks whether there is availability to insert an election for 'block' and if so, spawns a new election
 	nano::election_insertion_result activate (std::shared_ptr<nano::block> const & block);
 	// Returns whether there is availability to insert a new election
@@ -37,9 +35,8 @@ public:
 private:
 	size_t election_destruction_notification (nano::qualified_root const & root);
 
-	nano::active_transactions & active;
+	std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate_m;
 	size_t const limit_m;
-	nano::election_behavior behavior;
 	// Tracks the elections that have been started through this facade
 	std::unordered_set<nano::qualified_root> elections_m;
 	std::function<nano::election_insertion_result (std::shared_ptr<nano::block> block)> start_election;

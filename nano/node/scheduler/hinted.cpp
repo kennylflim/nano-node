@@ -12,7 +12,10 @@ nano::scheduler::hinted::hinted (config const & config_a, nano::node & node_a, n
 	config_m{ config_a },
 	node{ node_a },
 	inactive_vote_cache{ inactive_vote_cache_a },
-	limiter{ std::make_shared<nano::scheduler::limiter> (node.active, node.config.active_elections_hinted_limit_percentage * node.config.active_elections_size / 100, nano::election_behavior::hinted) },
+	limiter{ std::make_shared<nano::scheduler::limiter> ([this] (auto const & block) {
+		return node.active.insert (block, nano::election_behavior::hinted);
+	},
+	node.config.active_elections_hinted_limit_percentage * node.config.active_elections_size / 100) },
 	online_reps{ online_reps_a }, stats{ stats_a }
 {
 }

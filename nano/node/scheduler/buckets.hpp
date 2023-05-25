@@ -54,7 +54,6 @@ private:
 	bool priority_queue_predicate () const;
 	bool manual_queue_predicate () const;
 
-	std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate_m;
 	nano::scheduler::prioritization priority;
 
 	std::deque<std::tuple<std::shared_ptr<nano::block>, boost::optional<nano::uint128_t>, nano::election_behavior>> manual_queue;

@@ -5,10 +5,9 @@
 
 #include <boost/format.hpp>
 
-nano::scheduler::limiter::limiter (nano::active_transactions & active, size_t limit, nano::election_behavior behavior) :
-	active{ active },
-	limit_m{ limit },
-	behavior{ behavior }
+nano::scheduler::limiter::limiter (std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate, size_t limit) :
+	activate_m{ activate },
+	limit_m{ limit }
 {
 }
 
@@ -38,7 +37,7 @@ nano::election_insertion_result nano::scheduler::limiter::activate (std::shared_
 	}
 
 	// This code section is not synchronous with respect to available ()
-	auto result = active.insert (block, behavior);
+	auto result = activate_m (block);
 	if (result.inserted)
 	{
 		nano::lock_guard<nano::mutex> lock{ mutex };

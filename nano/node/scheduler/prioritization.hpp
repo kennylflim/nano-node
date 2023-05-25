@@ -9,6 +9,7 @@
 
 namespace nano
 {
+class active_transactions;
 class block;
 class node;
 class stats;
@@ -16,6 +17,7 @@ class stats;
 
 namespace nano::scheduler
 {
+class limiter;
 /** A container for holding blocks and their arrival/creation time.
  *
  *  The container consists of a number of buckets. Each bucket holds an ordered set of 'value_type' items.
@@ -40,7 +42,9 @@ class prioritization final
 	class bucket
 	{
 	public:
+		explicit bucket (std::shared_ptr<nano::scheduler::limiter> limiter);
 		std::set<value_type> queue;
+		std::shared_ptr<nano::scheduler::limiter> limiter;
 	};
 
 	nano::stats & stats;
@@ -67,7 +71,7 @@ class prioritization final
 	void populate_schedule ();
 
 public:
-	prioritization (nano::stats & stats, uint64_t maximum = 250000u, std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate = nullptr);
+	prioritization (nano::stats & stats, std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate, uint64_t maximum = 250000u);
 	void push (uint64_t time, std::shared_ptr<nano::block> block, nano::amount const & priority);
 	void activate ();
 	std::size_t size () const;
