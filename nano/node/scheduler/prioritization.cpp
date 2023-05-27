@@ -58,7 +58,7 @@ void nano::scheduler::prioritization::populate_schedule ()
 nano::scheduler::prioritization::prioritization (nano::stats & stats, std::function<nano::election_insertion_result (std::shared_ptr<nano::block>)> activate, uint64_t maximum) :
 	stats{ stats },
 	activate_m{ activate },
-	maximum{ maximum }
+	maximum{ std::max (maximum, uint64_t{ 1 }) }
 {
 	auto build_region = [this] (uint128_t const & begin, uint128_t const & end, size_t count) {
 		auto width = (end - begin) / count;
@@ -79,7 +79,7 @@ nano::scheduler::prioritization::prioritization (nano::stats & stats, std::funct
 	minimums.push_back (uint128_t{ 1 } << 120);
 	while (buckets.size () < minimums.size ())
 	{
-		buckets.emplace_back (std::make_shared<nano::scheduler::limiter> (activate_m, std::max (maximum / minimums.size (), 1ull)));
+		buckets.emplace_back (std::make_shared<nano::scheduler::limiter> (activate_m, std::max (maximum / minimums.size (), uint64_t{ 1 })));
 	}
 	populate_schedule ();
 	current = schedule.begin ();
@@ -100,7 +100,7 @@ void nano::scheduler::prioritization::push (uint64_t time, std::shared_ptr<nano:
 	auto was_empty = empty ();
 	auto & bucket = buckets[index (priority.number ())];
 	bucket.queue.emplace (value_type{ time, block });
-	if (bucket.queue.size () > std::max (decltype (maximum){ 1 }, maximum / buckets.size ()))
+	if (bucket.queue.size () > maximum)
 	{
 		bucket.queue.erase (--bucket.queue.end ());
 	}
