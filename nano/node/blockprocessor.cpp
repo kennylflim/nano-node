@@ -180,6 +180,7 @@ bool nano::block_processor::have_blocks ()
 
 void nano::block_processor::process_verified_state_blocks (std::deque<nano::state_block_signature_verification::value_type> & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures)
 {
+	std::deque<processed_t> bad_signatures;
 	{
 		nano::unique_lock<nano::mutex> lk{ mutex };
 		for (auto i (0); i < verifications.size (); ++i)
@@ -205,9 +206,14 @@ void nano::block_processor::process_verified_state_blocks (std::deque<nano::stat
 				// Non epoch blocks
 				blocks.emplace_back (block);
 			}
+			else
+			{
+				bad_signatures.emplace_back (nano::process_return{ nano::process_result::bad_signature }, block);
+			}
 			items.pop_front ();
 		}
 	}
+	batch_processed.notify (bad_signatures);
 	condition.notify_all ();
 }
 
