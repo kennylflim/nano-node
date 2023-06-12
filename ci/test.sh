@@ -47,10 +47,10 @@ run_tests()
         TIMEOUT_TIME_ARG=""
     fi
 
-    ${TIMEOUT_CMD} ${TIMEOUT_TIME_ARG} ${TIMEOUT_DEFAULT} ./core_test
+    ${TIMEOUT_CMD} ${TIMEOUT_TIME_ARG} ${TIMEOUT_DEFAULT} python3 ../submodules/gtest-parallel/gtest_parallel.py ./core_test
     core_test_res=${?}
 
-    ${TIMEOUT_CMD} ${TIMEOUT_TIME_ARG} ${TIMEOUT_DEFAULT} ./rpc_test
+    ${TIMEOUT_CMD} ${TIMEOUT_TIME_ARG} ${TIMEOUT_DEFAULT} python3 ../submodules/gtest-parallel/gtest_parallel.py ./rpc_test
     rpc_test_res=${?}
 
     xvfb_run_ ./qt_test
