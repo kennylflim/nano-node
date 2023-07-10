@@ -24,12 +24,48 @@ add_library(
   block_arrival.cpp
   block_broadcast.cpp
   block_broadcast.hpp
+  block_pipeline/account_state_filter.cpp
+  block_pipeline/account_state_filter.hpp
+  block_pipeline/block_position_filter.cpp
+  block_pipeline/block_position_filter.hpp
+  block_pipeline/context.cpp
+  block_pipeline/context.hpp
+  block_pipeline/epoch_restrictions_filter.cpp
+  block_pipeline/epoch_restrictions_filter.hpp
+  block_pipeline/link_filter.cpp
+  block_pipeline/link_filter.hpp
+  block_pipeline/metastable_filter.cpp
+  block_pipeline/metastable_filter.hpp
+  block_pipeline/receive_restrictions_filter.cpp
+  block_pipeline/receive_restrictions_filter.hpp
+  block_pipeline/reserved_account_filter.cpp
+  block_pipeline/reserved_account_filter.hpp
+  block_pipeline/send_restrictions_filter.cpp
+  block_pipeline/send_restrictions_filter.hpp
   block_publisher.cpp
   block_publisher.hpp
   gap_tracker.cpp
   gap_tracker.hpp
   blocking_observer.cpp
   blocking_observer.hpp
+  block_pipeline/account_state_filter.cpp
+  block_pipeline/account_state_filter.hpp
+  block_pipeline/block_position_filter.cpp
+  block_pipeline/block_position_filter.hpp
+  block_pipeline/context.cpp
+  block_pipeline/context.hpp
+  block_pipeline/epoch_restrictions_filter.cpp
+  block_pipeline/epoch_restrictions_filter.hpp
+  block_pipeline/link_filter.cpp
+  block_pipeline/link_filter.hpp
+  block_pipeline/metastable_filter.cpp
+  block_pipeline/metastable_filter.hpp
+  block_pipeline/receive_restrictions_filter.cpp
+  block_pipeline/receive_restrictions_filter.hpp
+  block_pipeline/reserved_account_filter.cpp
+  block_pipeline/reserved_account_filter.hpp
+  block_pipeline/send_restrictions_filter.cpp
+  block_pipeline/send_restrictions_filter.hpp
   blockprocessor.hpp
   blockprocessor.cpp
   bootstrap/block_deserializer.hpp
