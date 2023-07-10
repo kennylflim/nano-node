@@ -76,6 +76,7 @@ bool nano::state_block_signature_verification::is_active ()
 
 void nano::state_block_signature_verification::add (value_type const & item)
 {
+	debug_assert (item.state.has_value ());
 	{
 		nano::lock_guard<nano::mutex> guard (mutex);
 		state_blocks.emplace_back (item);
@@ -131,17 +132,15 @@ void nano::state_block_signature_verification::verify_state_blocks (std::deque<v
 		signatures.reserve (size);
 		std::vector<int> verifications;
 		verifications.resize (size, 0);
-		for (auto const & [block] : items)
+		for (auto const & item : items)
 		{
+			debug_assert (item.state.has_value ());
+			auto const & block = item.block;
 			hashes.push_back (block->hash ());
 			messages.push_back (hashes.back ().bytes.data ());
 			lengths.push_back (sizeof (decltype (hashes)::value_type));
-			nano::account account_l = block->account ();
-			if (!block->link ().is_zero () && epochs.is_epoch_link (block->link ()))
-			{
-				account_l = epochs.signer (epochs.epoch (block->link ()));
-			}
-			accounts.push_back (account_l);
+			nano::account account (item.signer (epochs));
+			accounts.push_back (account);
 			pub_keys.push_back (accounts.back ().bytes.data ());
 			blocks_signatures.push_back (block->block_signature ());
 			signatures.push_back (blocks_signatures.back ().bytes.data ());

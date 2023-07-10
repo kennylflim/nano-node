@@ -1,3 +1,4 @@
+#include <nano/lib/stats_enums.hpp>
 #include <nano/lib/threading.hpp>
 #include <nano/lib/timer.hpp>
 #include <nano/node/blockprocessor.hpp>
@@ -9,10 +10,12 @@
 std::chrono::milliseconds constexpr nano::block_processor::confirmation_request_delay;
 
 nano::block_processor::block_processor (nano::node & node_a, nano::write_database_queue & write_database_queue_a) :
+	account_state{ node_a.ledger },
+	link{ node_a.ledger.constants.epochs },
 	next_log (std::chrono::steady_clock::now ()),
 	node (node_a),
 	write_database_queue (write_database_queue_a),
-	state_block_signature_verification (node.checker, node.ledger.constants.epochs, node.config, node.logger, node.flags.block_processor_verification_size)
+	state_block_signature_verification (node.checker, node_a.ledger.constants.epochs, node.config, node.logger, node_a.flags.block_processor_verification_size)
 {
 	batch_processed.add ([this] (auto const & items) {
 		// For every batch item: notify the 'processed' observer.
@@ -23,9 +26,110 @@ nano::block_processor::block_processor (nano::node & node_a, nano::write_databas
 		}
 	});
 	blocking.connect (*this);
-	state_block_signature_verification.blocks_verified_callback = [this] (std::deque<nano::state_block_signature_verification::value_type> & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures) {
-		this->process_verified_state_blocks (items, verifications, hashes, blocks_signatures);
+	// Pipeline begin
+	pipeline = [this] (block_pipeline::context & context) {
+		debug_assert (context.block != nullptr);
+		reserved.sink (context);
 	};
+	reserved.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::reserved_account_filter_pass);
+		account_state.sink (context);
+	};
+	reserved.reject = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::reserved_account_filter_reject);
+	};
+	account_state.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::account_state_filter_pass);
+		position.sink (context);
+	};
+	account_state.reject_existing = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::account_state_filter_reject_existing);
+	};
+	account_state.reject_gap = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::account_state_filter_reject_gap);
+		node.gap_cache.add (context.block->hash ());
+		node.unchecked.put (context.block->previous (), context.block);
+	};
+	position.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::block_position_filter_pass);
+		state_block_signature_verification.add (context);
+	};
+	position.reject = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::block_position_filter_reject);
+	};
+	state_block_signature_verification.blocks_verified_callback = [this] (std::deque<nano::state_block_signature_verification::value_type> & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures) {
+		release_assert (items.size () == verifications.size ());
+		for (size_t i = 0, n = items.size (); i < n; ++i)
+		{
+			auto & item = items[i];
+			if (verifications[i] == 1)
+			{
+				metastable.sink (item);
+			}
+			else
+			{
+				//drop.sink (item);
+			}
+		}
+	};
+	metastable.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::metastable_filter_pass);
+		link.sink (context);
+	};
+	metastable.reject = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::metastable_filter_reject);
+		this->node.active.publish (context.block);
+	};
+	link.hash = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::link_filter_hash);
+		receive_restrictions.sink (context);
+	};
+	link.account = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::link_filter_account);
+		send_restrictions.sink (context);
+	};
+	link.noop = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::link_filter_noop);
+		enqueue (context);
+	};
+	link.epoch = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::link_filter_epoch);
+		epoch_restrictions.sink (context);
+	};
+	epoch_restrictions.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::epoch_restrictions_pass);
+		enqueue (context);
+	};
+	epoch_restrictions.reject_balance = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::epoch_restrictions_reject_balance);
+	};
+	epoch_restrictions.reject_representative = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::epoch_restrictions_reject_representative);
+	};
+	epoch_restrictions.reject_gap_open = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::epoch_restrictions_reject_gap_open);
+		node.unchecked.put (context.account (), context.block);
+	};
+	receive_restrictions.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::receive_restrictions_filter_pass);
+		enqueue (context);
+	};
+	receive_restrictions.reject_balance = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::receive_restrictions_filter_reject_balance);
+	};
+	receive_restrictions.reject_pending = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::receive_restrictions_filter_reject_pending);
+		node.gap_cache.add (context.block->hash ());
+		node.unchecked.put (context.source (), context.block);
+	};
+	send_restrictions.pass = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::send_restrictions_filter_pass);
+		enqueue (context);
+	};
+	send_restrictions.reject = [this] (block_pipeline::context & context) {
+		node.stats.inc (nano::stat::type::block_pipeline, nano::stat::detail::send_restrictions_filter_reject);
+	};
+	// Pipeline end
 	state_block_signature_verification.transition_inactive_callback = [this] () {
 		if (this->flushing)
 		{
@@ -69,7 +173,7 @@ void nano::block_processor::flush ()
 std::size_t nano::block_processor::size ()
 {
 	nano::unique_lock<nano::mutex> lock{ mutex };
-	return (blocks.size () + state_block_signature_verification.size () + forced.size ());
+	return (blocks.size () + state_block_signature_verification.size ());
 }
 
 bool nano::block_processor::full ()
@@ -82,26 +186,23 @@ bool nano::block_processor::half_full ()
 	return size () >= node.flags.block_processor_full_size / 2;
 }
 
-void nano::block_processor::add (std::shared_ptr<nano::block> const & block)
+void nano::block_processor::add (value_type & item)
 {
-	if (full ())
-	{
-		node.stats.inc (nano::stat::type::blockprocessor, nano::stat::detail::overfill);
-		return;
-	}
-	if (node.network_params.work.validate_entry (*block)) // true => error
-	{
-		node.stats.inc (nano::stat::type::blockprocessor, nano::stat::detail::insufficient_work);
-		return;
-	}
-	add_impl (block);
-	return;
+	debug_assert (!node.network_params.work.validate_entry (*item.block));
+	pipeline (item);
+}
+
+void nano::block_processor::add (std::shared_ptr<nano::block> const & block_a)
+{
+	value_type item{ block_a };
+	add (item);
 }
 
 std::optional<nano::process_return> nano::block_processor::add_blocking (std::shared_ptr<nano::block> const & block)
 {
 	auto future = blocking.insert (block);
-	add_impl (block);
+	//add_impl (block);
+	add (block);
 	condition.notify_all ();
 	std::optional<nano::process_return> result;
 	try
@@ -159,11 +260,9 @@ void nano::block_processor::rollback_competitor (nano::write_transaction const &
 
 void nano::block_processor::force (std::shared_ptr<nano::block> const & block_a)
 {
-	{
-		nano::lock_guard<nano::mutex> lock{ mutex };
-		forced.push_back (block_a);
-	}
-	condition.notify_all ();
+	value_type item{ block_a };
+	item.forced = true;
+	add (item);
 }
 
 void nano::block_processor::process_blocks ()
@@ -203,7 +302,7 @@ bool nano::block_processor::should_log ()
 bool nano::block_processor::have_blocks_ready ()
 {
 	debug_assert (!mutex.try_lock ());
-	return !blocks.empty () || !forced.empty ();
+	return !blocks.empty ();
 }
 
 bool nano::block_processor::have_blocks ()
@@ -212,15 +311,42 @@ bool nano::block_processor::have_blocks ()
 	return have_blocks_ready () || state_block_signature_verification.size () != 0;
 }
 
+void nano::block_processor::pipeline_dump ()
+{
+	auto dump_stage = [this] (nano::stat::detail detail) {
+		std::cerr << boost::str (boost::format ("%1%: %2%\n") % nano::to_string (detail) % std::to_string (node.stats.count (nano::stat::type::block_pipeline, detail)));
+	};
+	dump_stage (nano::stat::detail::account_state_filter_pass);
+	dump_stage (nano::stat::detail::account_state_filter_reject_existing);
+	dump_stage (nano::stat::detail::account_state_filter_reject_gap);
+	dump_stage (nano::stat::detail::block_position_filter_pass);
+	dump_stage (nano::stat::detail::block_position_filter_reject);
+	dump_stage (nano::stat::detail::link_filter_hash);
+	dump_stage (nano::stat::detail::link_filter_account);
+	dump_stage (nano::stat::detail::link_filter_noop);
+	dump_stage (nano::stat::detail::link_filter_epoch);
+	dump_stage (nano::stat::detail::metastable_filter_pass);
+	dump_stage (nano::stat::detail::metastable_filter_reject);
+	dump_stage (nano::stat::detail::receive_restrictions_filter_pass);
+	dump_stage (nano::stat::detail::receive_restrictions_filter_reject_balance);
+	dump_stage (nano::stat::detail::receive_restrictions_filter_reject_pending);
+	dump_stage (nano::stat::detail::reserved_account_filter_pass);
+	dump_stage (nano::stat::detail::reserved_account_filter_reject);
+	dump_stage (nano::stat::detail::send_restrictions_filter_pass);
+	dump_stage (nano::stat::detail::send_restrictions_filter_reject);
+	std::cerr << '\n';
+}
+
 void nano::block_processor::process_verified_state_blocks (std::deque<nano::state_block_signature_verification::value_type> & items, std::vector<int> const & verifications, std::vector<nano::block_hash> const & hashes, std::vector<nano::signature> const & blocks_signatures)
 {
+
 	{
 		nano::unique_lock<nano::mutex> lk{ mutex };
 		for (auto i (0); i < verifications.size (); ++i)
 		{
 			debug_assert (verifications[i] == 1 || verifications[i] == 0);
 			auto & item = items.front ();
-			auto & [block] = item;
+			auto & block = item.block;
 			if (!block->link ().is_zero () && node.ledger.is_epoch_link (block->link ()))
 			{
 				// Epoch blocks
@@ -270,40 +396,30 @@ auto nano::block_processor::process_batch (nano::unique_lock<nano::mutex> & lock
 	lock_a.lock ();
 	timer_l.start ();
 	// Processing blocks
-	unsigned number_of_blocks_processed (0), number_of_forced_processed (0);
+	unsigned number_of_blocks_processed{ 0 };
 	auto deadline_reached = [&timer_l, deadline = node.config.block_processor_batch_max_time] { return timer_l.after_deadline (deadline); };
 	auto processor_batch_reached = [&number_of_blocks_processed, max = node.flags.block_processor_batch_size] { return number_of_blocks_processed >= max; };
 	auto store_batch_reached = [&number_of_blocks_processed, max = node.store.max_block_write_batch_num ()] { return number_of_blocks_processed >= max; };
 	while (have_blocks_ready () && (!deadline_reached () || !processor_batch_reached ()) && !store_batch_reached ())
 	{
-		if ((blocks.size () + state_block_signature_verification.size () + forced.size () > 64) && should_log ())
+		if ((blocks.size () + state_block_signature_verification.size () > 64) && should_log ())
 		{
-			node.logger.always_log (boost::str (boost::format ("%1% blocks (+ %2% state blocks) (+ %3% forced) in processing queue") % blocks.size () % state_block_signature_verification.size () % forced.size ()));
+			node.logger.always_log (boost::str (boost::format ("%1% blocks (+ %2% state blocks) in processing queue") % blocks.size () % state_block_signature_verification.size ()));
 		}
-		std::shared_ptr<nano::block> block;
-		nano::block_hash hash (0);
-		bool force (false);
-		if (forced.empty ())
-		{
-			block = blocks.front ();
-			blocks.pop_front ();
-			hash = block->hash ();
-		}
-		else
-		{
-			block = forced.front ();
-			forced.pop_front ();
-			hash = block->hash ();
-			force = true;
-			number_of_forced_processed++;
-		}
+		debug_assert (!blocks.empty ());
+		debug_assert (blocks.front ().block != nullptr);
+		auto info = blocks.front (); // Aliased with 'block'
+		blocks.pop_front ();
+		debug_assert (info.block != nullptr);
 		lock_a.unlock ();
-		if (force)
+		auto & block = info.block; // Aliased with 'info'
+		debug_assert (block != nullptr);
+		number_of_blocks_processed++;
+		if (info.forced)
 		{
 			rollback_competitor (transaction, *block);
 		}
-		number_of_blocks_processed++;
-		auto result = process_one (transaction, block, force);
+		auto result = process_one (transaction, block);
 		processed.emplace_back (result, block);
 		lock_a.lock ();
 	}
@@ -311,7 +427,7 @@ auto nano::block_processor::process_batch (nano::unique_lock<nano::mutex> & lock
 
 	if (node.config.logging.timing_logging () && number_of_blocks_processed != 0 && timer_l.stop () > std::chrono::milliseconds (100))
 	{
-		node.logger.always_log (boost::str (boost::format ("Processed %1% blocks (%2% blocks were forced) in %3% %4%") % number_of_blocks_processed % number_of_forced_processed % timer_l.value ().count () % timer_l.unit ()));
+		node.logger.always_log (boost::str (boost::format ("Processed %1% blocks in %3% %4%") % number_of_blocks_processed % timer_l.value ().count () % timer_l.unit ()));
 	}
 	return processed;
 }
@@ -351,6 +467,7 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 			}
 			node.unchecked.put (block->previous (), block);
 			node.stats.inc (nano::stat::type::ledger, nano::stat::detail::gap_previous);
+
 			break;
 		}
 		case nano::process_result::gap_source:
@@ -462,7 +579,18 @@ nano::process_return nano::block_processor::process_one (nano::write_transaction
 	return result;
 }
 
-void nano::block_processor::queue_unchecked (nano::write_transaction const & transaction_a, nano::hash_or_account const & hash_or_account_a)
+void nano::block_processor::enqueue (value_type const & item)
+{
+	debug_assert (item.block != nullptr);
+
+	nano::unique_lock<nano::mutex> lock{ mutex };
+	blocks.emplace_back (item);
+	debug_assert (blocks.back ().block != nullptr);
+	lock.unlock ();
+	condition.notify_all ();
+}
+
+void nano::block_processor::queue_unchecked (nano::write_transaction const &, nano::hash_or_account const & hash_or_account_a)
 {
 	node.unchecked.trigger (hash_or_account_a);
 	node.gap_cache.erase (hash_or_account_a.hash);
@@ -476,12 +604,11 @@ std::unique_ptr<nano::container_info_component> nano::collect_container_info (bl
 	{
 		nano::lock_guard<nano::mutex> guard{ block_processor.mutex };
 		blocks_count = block_processor.blocks.size ();
-		forced_count = block_processor.forced.size ();
 	}
 
 	auto composite = std::make_unique<container_info_composite> (name);
 	composite->add_component (collect_container_info (block_processor.state_block_signature_verification, "state_block_signature_verification"));
 	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "blocks", blocks_count, sizeof (decltype (block_processor.blocks)::value_type) }));
-	composite->add_component (std::make_unique<container_info_leaf> (container_info{ "forced", forced_count, sizeof (decltype (block_processor.forced)::value_type) }));
+
 	return composite;
 }

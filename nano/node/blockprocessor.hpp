@@ -1,6 +1,15 @@
 #pragma once
 
 #include <nano/lib/blocks.hpp>
+#include <nano/node/block_pipeline/account_state_filter.hpp>
+#include <nano/node/block_pipeline/block_position_filter.hpp>
+#include <nano/node/block_pipeline/context.hpp>
+#include <nano/node/block_pipeline/epoch_restrictions_filter.hpp>
+#include <nano/node/block_pipeline/link_filter.hpp>
+#include <nano/node/block_pipeline/metastable_filter.hpp>
+#include <nano/node/block_pipeline/receive_restrictions_filter.hpp>
+#include <nano/node/block_pipeline/reserved_account_filter.hpp>
+#include <nano/node/block_pipeline/send_restrictions_filter.hpp>
 #include <nano/node/blocking_observer.hpp>
 #include <nano/node/state_block_signature_verification.hpp>
 #include <nano/secure/common.hpp>
@@ -25,12 +34,15 @@ class write_database_queue;
 class block_processor final
 {
 public:
+	using value_type = block_pipeline::context;
+
 	explicit block_processor (nano::node &, nano::write_database_queue &);
 	void stop ();
 	void flush ();
 	std::size_t size ();
 	bool full ();
 	bool half_full ();
+	void add (value_type & item);
 	void add (std::shared_ptr<nano::block> const &);
 	std::optional<nano::process_return> add_blocking (std::shared_ptr<nano::block> const & block);
 	void force (std::shared_ptr<nano::block> const &);
@@ -53,9 +65,24 @@ public: // Events
 private:
 	blocking_observer blocking;
 
+public: // Pipeline
+	void pipeline_dump ();
+
+private: // Pipeline
+	std::function<void (value_type &)> pipeline;
+	nano::block_pipeline::reserved_account_filter reserved;
+	nano::block_pipeline::account_state_filter account_state;
+	nano::block_pipeline::block_position_filter position;
+	nano::block_pipeline::metastable_filter metastable;
+	nano::block_pipeline::link_filter link;
+	nano::block_pipeline::epoch_restrictions_filter epoch_restrictions;
+	nano::block_pipeline::receive_restrictions_filter receive_restrictions;
+	nano::block_pipeline::send_restrictions_filter send_restrictions;
+
 private:
 	// Roll back block in the ledger that conflicts with 'block'
 	void rollback_competitor (nano::write_transaction const & transaction, nano::block const & block);
+	void enqueue (value_type const & item);
 	nano::process_return process_one (nano::write_transaction const &, std::shared_ptr<nano::block> block, bool const = false);
 	void queue_unchecked (nano::write_transaction const &, nano::hash_or_account const &);
 	std::deque<processed_t> process_batch (nano::unique_lock<nano::mutex> &);
@@ -64,8 +91,8 @@ private:
 	bool stopped{ false };
 	bool active{ false };
 	std::chrono::steady_clock::time_point next_log;
-	std::deque<std::shared_ptr<nano::block>> blocks;
-	std::deque<std::shared_ptr<nano::block>> forced;
+	std::deque<value_type> blocks;
+
 	nano::condition_variable condition;
 	nano::node & node;
 	nano::write_database_queue & write_database_queue;
