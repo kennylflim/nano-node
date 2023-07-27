@@ -383,7 +383,7 @@ void nano::active_transactions::trim ()
 	while (vacancy () < -(limit () / 4))
 	{
 		node.stats.inc (nano::stat::type::active, nano::stat::detail::erase_oldest);
-		erase_oldest ();
+		erase_lowest ();
 	}
 }
 
@@ -409,7 +409,7 @@ nano::election_insertion_result nano::active_transactions::insert_impl (nano::un
 					node.online_reps.observe (rep_a);
 				},
 				election_behavior_a);
-				roots.get<tag_root> ().emplace (nano::active_transactions::conflict_info{ root, result.election });
+				roots.get<tag_root> ().emplace (nano::active_transactions::conflict_info{ result.election });
 				blocks.emplace (hash, result.election);
 				// Keep track of election count by election type
 				debug_assert (count_by_behavior[result.election->behavior ()] >= 0);
@@ -576,13 +576,13 @@ void nano::active_transactions::erase_hash (nano::block_hash const & hash_a)
 	debug_assert (erased == 1);
 }
 
-void nano::active_transactions::erase_oldest ()
+void nano::active_transactions::erase_lowest ()
 {
 	nano::unique_lock<nano::mutex> lock{ mutex };
 	if (!roots.empty ())
 	{
-		auto item = roots.get<tag_sequenced> ().front ();
-		cleanup_election (lock, item.election);
+		auto item = roots.get<tag_total> ().begin ();
+		cleanup_election (lock, item->election);
 	}
 }
 

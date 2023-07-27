@@ -10,6 +10,7 @@
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index_container.hpp>
 
 #include <atomic>
@@ -112,7 +113,20 @@ private: // Elections
 	class conflict_info final
 	{
 	public:
-		nano::qualified_root root;
+		nano::qualified_root qualified_root () const
+		{
+			return election->qualified_root;
+		}
+		nano::uint128_t vote_total () const
+		{
+			nano::uint128_t result{ 0 };
+			auto status = election->current_status ();
+			for (auto i = status.tally.begin (), n = status.tally.end (); i != n; ++i)
+			{
+				result += i->first;
+			}
+			return result;
+		}
 		std::shared_ptr<nano::election> election;
 	};
 
@@ -125,12 +139,15 @@ private: // Elections
 	class tag_uncemented {};
 	class tag_arrival {};
 	class tag_hash {};
+	class tag_total {};
 
 	using ordered_roots = boost::multi_index_container<conflict_info,
 	mi::indexed_by<
 		mi::sequenced<mi::tag<tag_sequenced>>,
 		mi::hashed_unique<mi::tag<tag_root>,
-			mi::member<conflict_info, nano::qualified_root, &conflict_info::root>>
+			mi::const_mem_fun<conflict_info, nano::qualified_root, &conflict_info::qualified_root>>,
+		mi::ordered_non_unique<mi::tag<tag_total>,
+			mi::const_mem_fun<conflict_info, nano::uint128_t, &conflict_info::vote_total>>
 	>>;
 	// clang-format on
 	ordered_roots roots;
@@ -162,7 +179,7 @@ public:
 	std::vector<std::shared_ptr<nano::election>> list_active (std::size_t = std::numeric_limits<std::size_t>::max ());
 	void erase (nano::block const &);
 	void erase_hash (nano::block_hash const &);
-	void erase_oldest ();
+	void erase_lowest ();
 	bool empty () const;
 	std::size_t size () const;
 	bool publish (std::shared_ptr<nano::block> const &);
