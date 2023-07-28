@@ -582,6 +582,11 @@ void nano::active_transactions::erase_lowest ()
 	if (!roots.empty ())
 	{
 		auto item = roots.get<tag_total> ().begin ();
+		while (item != roots.get<tag_total> ().end () && item->election->since () > 5s)
+		{
+			// Don't trim recently added transactions
+			++item;
+		}
 		cleanup_election (lock, item->election);
 	}
 }

@@ -636,6 +636,11 @@ std::unordered_map<nano::block_hash, std::shared_ptr<nano::block>> nano::electio
 	return last_blocks;
 }
 
+std::chrono::steady_clock::duration nano::election::since () const
+{
+	return std::chrono::steady_clock::now () - election_start;
+}
+
 std::unordered_map<nano::account, nano::vote_info> nano::election::votes () const
 {
 	nano::lock_guard<nano::mutex> guard{ mutex };
