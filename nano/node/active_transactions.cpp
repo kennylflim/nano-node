@@ -587,7 +587,14 @@ void nano::active_transactions::erase_lowest ()
 			// Don't trim recently added transactions
 			++item;
 		}
-		cleanup_election (lock, item->election);
+		if (item != roots.get<tag_total> ().end ())
+		{
+			cleanup_election (lock, item->election);
+		}
+		else
+		{
+			// All elections are within 5s, let the container grow
+		}
 	}
 }
 
