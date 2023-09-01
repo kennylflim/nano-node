@@ -79,9 +79,9 @@ bool nano::scheduler::hinted::run_one (nano::uint128_t const & minimum_tally)
 				// We check for AEC vacancy inside our predicate
 				auto result = node.active.insert (block, nano::election_behavior::hinted);
 
-				stats.inc (nano::stat::type::hinting, result.inserted ? nano::stat::detail::insert : nano::stat::detail::insert_failed);
+				stats.inc (nano::stat::type::hinting, result.second ? nano::stat::detail::insert : nano::stat::detail::insert_failed);
 
-				return result.inserted; // Return whether block was inserted
+				return result.second; // Return whether block was inserted
 			}
 		}
 		else

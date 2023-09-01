@@ -85,7 +85,6 @@ add_library(
   distributed_work_factory.cpp
   election.hpp
   election.cpp
-  election_insertion_result.hpp
   epoch_upgrader.hpp
   epoch_upgrader.cpp
   gap_cache.hpp

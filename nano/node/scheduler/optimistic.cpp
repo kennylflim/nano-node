@@ -156,7 +156,7 @@ void nano::scheduler::optimistic::run_one (nano::transaction const & transaction
 			// We check for AEC vacancy inside our predicate
 			auto result = node.active.insert (block, nano::election_behavior::optimistic);
 
-			stats.inc (nano::stat::type::optimistic_scheduler, result.inserted ? nano::stat::detail::insert : nano::stat::detail::insert_failed);
+			stats.inc (nano::stat::type::optimistic_scheduler, result.second ? nano::stat::detail::insert : nano::stat::detail::insert_failed);
 		}
 	}
 }

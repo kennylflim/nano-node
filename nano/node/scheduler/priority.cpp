@@ -142,13 +142,13 @@ void nano::scheduler::priority::run ()
 				lock.unlock ();
 				stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::insert_priority);
 				auto result = node.active.insert (block);
-				if (result.inserted)
+				if (result.second)
 				{
 					stats.inc (nano::stat::type::election_scheduler, nano::stat::detail::insert_priority_success);
 				}
-				if (result.election != nullptr)
+				if (result.first != nullptr)
 				{
-					result.election->transition_active ();
+					result.first->transition_active ();
 				}
 			}
 			else
