@@ -17,6 +17,7 @@ enum class tables
 	peers,
 	pending,
 	pruned,
+	successor,
 	vote
 };
 } // namespace nano

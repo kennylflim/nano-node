@@ -25,6 +25,7 @@ namespace store
 	class peer;
 	class pending;
 	class pruned;
+	class successor;
 	class version;
 }
 class ledger_cache;
@@ -50,7 +51,8 @@ namespace store
 		nano::store::peer &,
 		nano::store::confirmation_height &,
 		nano::store::final_vote &,
-		nano::store::version &
+		nano::store::version &,
+		nano::store::successor &
 	);
 		// clang-format on
 		virtual ~component () = default;
@@ -75,6 +77,7 @@ namespace store
 		store::confirmation_height & confirmation_height;
 		store::final_vote & final_vote;
 		store::version & version;
+		store::successor & successor;
 
 		virtual unsigned max_block_write_batch_num () const = 0;
 
