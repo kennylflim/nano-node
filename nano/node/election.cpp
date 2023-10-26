@@ -350,6 +350,7 @@ void nano::election::confirm_if_quorum (nano::unique_lock<nano::mutex> & lock_a)
 	}
 	if (sum >= node.online_reps.delta () && winner_hash_l != status_winner_hash_l)
 	{
+		(void)sum;
 		status.winner = block_l;
 		remove_votes (status_winner_hash_l);
 		node.block_processor.force (block_l);
