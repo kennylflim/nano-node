@@ -37,9 +37,12 @@ public:
 class transaction
 {
 public:
-	virtual ~transaction () = default;
+	transaction ();
+	virtual ~transaction ();
 	virtual void * get_handle () const = 0;
 	virtual nano::id_dispenser::id_t store_id () const = 0;
+private:
+	std::chrono::steady_clock::time_point start;
 };
 
 /**

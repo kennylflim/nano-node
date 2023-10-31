@@ -1,6 +1,26 @@
+#include <nano/lib/stacktrace.hpp>
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/utility.hpp>
 #include <nano/store/transaction.hpp>
+
+#include <boost/format.hpp>
+
+#include <iostream>
+
+nano::store::transaction::transaction () :
+	start{ std::chrono::steady_clock::now () }
+{
+}
+
+nano::store::transaction::~transaction ()
+{
+	auto diff = std::chrono::steady_clock::now () - start;
+	if (diff > std::chrono::seconds{ 5 })
+	{
+		auto stacktrace = generate_stacktrace ();
+		std::cerr << boost::str (boost::format ("Long transaction: %1%ms\n%2%") % std::chrono::duration_cast<std::chrono::milliseconds> (diff).count () % stacktrace);
+	}
+}
 
 /*
  * transaction_impl
