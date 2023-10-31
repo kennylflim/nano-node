@@ -326,7 +326,7 @@ nano::node::node (boost::asio::io_context & io_ctx_a, std::filesystem::path cons
 		observers.vote.add ([this] (std::shared_ptr<nano::vote> vote_a, std::shared_ptr<nano::transport::channel> const & channel_a, nano::vote_code code_a) {
 			debug_assert (code_a != nano::vote_code::invalid);
 			// The vote_code::vote is handled inside the election
-			if (code_a == nano::vote_code::indeterminate)
+			if (code_a != nano::vote_code::replay)
 			{
 				auto active_in_rep_crawler (!this->rep_crawler.response (channel_a, vote_a));
 				if (active_in_rep_crawler)
