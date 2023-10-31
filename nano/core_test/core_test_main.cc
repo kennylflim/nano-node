@@ -4,8 +4,6 @@
 #include <nano/node/logging.hpp>
 #include <nano/secure/utility.hpp>
 
-#include <boost/filesystem/path.hpp>
-
 constexpr std::size_t OPEN_FILE_DESCRIPTORS_LIMIT = 16384;
 
 namespace nano

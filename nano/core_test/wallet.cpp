@@ -7,8 +7,6 @@
 
 #include <gtest/gtest.h>
 
-#include <boost/filesystem.hpp>
-
 using namespace std::chrono_literals;
 unsigned constexpr nano::wallet_store::version_current;
 
