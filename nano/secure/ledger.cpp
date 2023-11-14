@@ -4,6 +4,7 @@
 #include <nano/lib/utility.hpp>
 #include <nano/lib/work.hpp>
 #include <nano/node/make_store.hpp>
+#include <nano/secure/block_check_context.hpp>
 #include <nano/secure/common.hpp>
 #include <nano/secure/ledger.hpp>
 #include <nano/store/account.hpp>
@@ -331,7 +332,6 @@ void ledger_processor::state_block_impl (nano::state_block & block_a)
 					if (result.code == nano::process_result::progress)
 					{
 						ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::state_block);
-						block_a.sideband_set (nano::block_sideband (block_a.hashables.account /* unused */, 0 /* unused */, info.block_count + 1, nano::seconds_since_epoch (), block_details, source_epoch));
 						ledger.store.block.put (transaction, hash, block_a);
 						if (!block_a.hashables.previous.is_zero ())
 						{
@@ -424,7 +424,6 @@ void ledger_processor::epoch_block_impl (nano::state_block & block_a)
 							if (result.code == nano::process_result::progress)
 							{
 								ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::epoch_block);
-								block_a.sideband_set (nano::block_sideband (block_a.hashables.account /* unused */, 0 /* unused */, info.block_count + 1, nano::seconds_since_epoch (), block_details, nano::epoch::epoch_0 /* unused */));
 								ledger.store.block.put (transaction, hash, block_a);
 								if (!block_a.hashables.previous.is_zero ())
 								{
@@ -470,7 +469,6 @@ void ledger_processor::change_block (nano::change_block & block_a)
 						if (result.code == nano::process_result::progress)
 						{
 							debug_assert (!validate_message (account, hash, block_a.signature));
-							block_a.sideband_set (nano::block_sideband (account, info->balance, info->block_count + 1, nano::seconds_since_epoch (), block_details, nano::epoch::epoch_0 /* unused */));
 							ledger.store.block.put (transaction, hash, block_a);
 							ledger.store.successor.put (transaction, block_a.hashables.previous, hash);
 							auto balance (ledger.balance (transaction, block_a.hashables.previous));
@@ -520,7 +518,6 @@ void ledger_processor::send_block (nano::send_block & block_a)
 							{
 								auto amount (info->balance.number () - block_a.hashables.balance.number ());
 								ledger.cache.rep_weights.representation_add (info->representative, 0 - amount);
-								block_a.sideband_set (nano::block_sideband (account, block_a.hashables.balance /* unused */, info->block_count + 1, nano::seconds_since_epoch (), block_details, nano::epoch::epoch_0 /* unused */));
 								ledger.store.block.put (transaction, hash, block_a);
 								ledger.store.successor.put (transaction, block_a.hashables.previous, hash);
 								nano::account_info new_info (hash, info->representative, info->open_block, block_a.hashables.balance, nano::seconds_since_epoch (), info->block_count + 1, nano::epoch::epoch_0);
@@ -571,7 +568,7 @@ void ledger_processor::receive_block (nano::receive_block & block_a)
 								result.code = ledger.store.pending.get (transaction, key, pending) ? nano::process_result::unreceivable : nano::process_result::progress; // Has this source already been received (Malformed)
 								if (result.code == nano::process_result::progress)
 								{
-									result.code = pending.epoch == nano::epoch::epoch_0 ? nano::process_result::progress : nano::process_result::unreceivable; // Are we receiving a state-only send? (Malformed)
+									result.code = pending.epoch == nano::epoch::epoch_0 ? nano::process_result::progress : nano::process_result::block_position; // Are we receiving a state-only send? (Malformed)
 									if (result.code == nano::process_result::progress)
 									{
 										nano::block_details block_details (nano::epoch::epoch_0, false /* unused */, false /* unused */, false /* unused */);
@@ -587,7 +584,6 @@ void ledger_processor::receive_block (nano::receive_block & block_a)
 											}
 #endif
 											ledger.store.pending.del (transaction, key);
-											block_a.sideband_set (nano::block_sideband (account, new_balance, info->block_count + 1, nano::seconds_since_epoch (), block_details, nano::epoch::epoch_0 /* unused */));
 											ledger.store.block.put (transaction, hash, block_a);
 											ledger.store.successor.put (transaction, block_a.hashables.previous, hash);
 											nano::account_info new_info (hash, info->representative, info->open_block, new_balance, nano::seconds_since_epoch (), info->block_count + 1, nano::epoch::epoch_0);
@@ -652,7 +648,6 @@ void ledger_processor::open_block (nano::open_block & block_a)
 									}
 #endif
 									ledger.store.pending.del (transaction, key);
-									block_a.sideband_set (nano::block_sideband (block_a.hashables.account, pending.amount, 1, nano::seconds_since_epoch (), block_details, nano::epoch::epoch_0 /* unused */));
 									ledger.store.block.put (transaction, hash, block_a);
 									nano::account_info new_info (hash, block_a.representative (), hash, pending.amount.number (), nano::seconds_since_epoch (), 1, nano::epoch::epoch_0);
 									ledger.update_account (transaction, block_a.hashables.account, info, new_info);
@@ -903,13 +898,18 @@ std::optional<nano::pending_info> nano::ledger::pending_info (store::transaction
 nano::process_return nano::ledger::process (store::write_transaction const & transaction_a, nano::block & block_a)
 {
 	debug_assert (!constants.work.validate_entry (block_a) || constants.genesis == nano::dev::genesis);
-	ledger_processor processor (*this, transaction_a);
-	block_a.visit (processor);
-	if (processor.result.code == nano::process_result::progress)
+	nano::block_check_context ctx{ transaction_a, *this, block_a };
+	auto code = ctx.check ();
+	if (code == nano::process_result::progress)
 	{
+		debug_assert (block_a.has_sideband ());
+		ledger_processor processor (*this, transaction_a);
+		block_a.visit (processor);
+		debug_assert (processor.result.code == nano::process_result::progress);
 		++cache.block_count;
+		return processor.result;
 	}
-	return processor.result;
+	return { code };
 }
 
 nano::block_hash nano::ledger::representative (store::transaction const & transaction_a, nano::block_hash const & hash_a)
