@@ -268,22 +268,11 @@ void nano::test::system::deadline_set (std::chrono::duration<double, std::nano> 
 
 std::error_code nano::test::system::poll (std::chrono::nanoseconds const & wait_time)
 {
-#if NANO_ASIO_HANDLER_TRACKING == 0
-	io_ctx.run_one_for (wait_time);
-#else
-	nano::timer<> timer;
-	timer.start ();
 	auto count = io_ctx.poll_one ();
 	if (count == 0)
 	{
-		std::this_thread::sleep_for (wait_time);
+		std::this_thread::sleep_for (std::chrono::milliseconds{ 1 });
 	}
-	else if (count == 1 && timer.since_start ().count () >= NANO_ASIO_HANDLER_TRACKING)
-	{
-		auto timestamp = std::chrono::duration_cast<std::chrono::microseconds> (std::chrono::system_clock::now ().time_since_epoch ()).count ();
-		std::cout << (boost::format ("[%1%] io_thread held for %2%ms") % timestamp % timer.since_start ().count ()).str () << std::endl;
-	}
-#endif
 
 	std::error_code ec;
 	if (std::chrono::steady_clock::now () > deadline)

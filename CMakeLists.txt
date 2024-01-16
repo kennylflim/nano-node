@@ -141,11 +141,6 @@ if(${NANO_TIMED_LOCKS} GREATER 0)
   endif()
 endif()
 
-if(${NANO_ASIO_HANDLER_TRACKING} GREATER 0)
-  add_definitions(-DNANO_ASIO_HANDLER_TRACKING=${NANO_ASIO_HANDLER_TRACKING}
-                  -DBOOST_ASIO_ENABLE_HANDLER_TRACKING)
-endif()
-
 option(NANO_SIMD_OPTIMIZATIONS
        "Enable CPU-specific SIMD optimizations (SSE/AVX or NEON, e.g.)" OFF)
 option(

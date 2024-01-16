@@ -24,8 +24,5 @@ private:
 	nano::thread_role::name const role;
 	std::vector<boost::thread> threads;
 	boost::asio::executor_work_guard<boost::asio::io_context::executor_type> io_guard;
-
-private:
-	void run (boost::asio::io_context &);
 };
 } // namespace nano
