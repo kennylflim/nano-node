@@ -6048,7 +6048,7 @@ TEST (rpc, simultaneous_calls)
 	ASSERT_TRUE (ipc_tcp_port.has_value ());
 	rpc_config.rpc_process.num_ipc_connections = 8;
 	nano::ipc_rpc_processor ipc_rpc_processor (node->io_ctx, rpc_config, ipc_tcp_port.value ());
-	nano::rpc rpc (node->io_ctx, rpc_config, ipc_rpc_processor);
+	nano::rpc rpc (rpc_config, ipc_rpc_processor);
 	rpc.start ();
 	boost::property_tree::ptree request;
 	request.put ("action", "account_block_count");

@@ -50,7 +50,7 @@ nano::test::rpc_context nano::test::add_rpc (nano::test::system & system, std::s
 	const auto ipc_tcp_port = ipc_server->listening_tcp_port ();
 	debug_assert (ipc_tcp_port.has_value ());
 	auto ipc_rpc_processor (std::make_unique<nano::ipc_rpc_processor> (node_a->io_ctx, rpc_config, ipc_tcp_port.value ()));
-	auto rpc (std::make_shared<nano::rpc> (node_a->io_ctx, rpc_config, *ipc_rpc_processor));
+	auto rpc (std::make_shared<nano::rpc> (rpc_config, *ipc_rpc_processor));
 	rpc->start ();
 
 	return rpc_context{ rpc, ipc_server, ipc_rpc_processor, node_rpc_config };

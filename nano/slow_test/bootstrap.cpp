@@ -34,7 +34,7 @@ public:
 		rpc_config{ node.network_params.network, port, true },
 		ipc{ node, node_rpc_config },
 		ipc_rpc_processor{ node.io_ctx, rpc_config },
-		rpc{ node.io_ctx, rpc_config, ipc_rpc_processor }
+		rpc{ rpc_config, ipc_rpc_processor }
 	{
 	}
 

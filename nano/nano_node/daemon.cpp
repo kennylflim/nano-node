@@ -168,7 +168,7 @@ void nano_daemon::daemon::run (std::filesystem::path const & data_path, nano::no
 								io_ctx.stop ();
 							});
 						});
-						rpc = nano::get_rpc (node->io_ctx, rpc_config, *rpc_handler);
+						rpc = nano::get_rpc (rpc_config, *rpc_handler);
 						rpc->start ();
 					}
 					else
