@@ -69,7 +69,10 @@ public:
 
 	void close (boost::beast::websocket::close_reason const & reason_a, boost::system::error_code & ec_a) override
 	{
-		ws.close (reason_a, ec_a);
+		if (ws.is_open ())
+		{
+			ws.close (reason_a, ec_a);
+		}
 	}
 
 	void async_write (nano::shared_const_buffer const & buffer_a, std::function<void (boost::system::error_code, std::size_t)> callback_a) override
