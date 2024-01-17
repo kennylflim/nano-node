@@ -65,13 +65,16 @@ void nano::transport::tcp_listener::start (std::function<bool (std::shared_ptr<n
 
 void nano::transport::tcp_listener::stop ()
 {
-	decltype (connections) connections_l;
-	{
-		nano::lock_guard<nano::mutex> lock{ mutex };
-		on = false;
-		connections_l.swap (connections);
-	}
 	nano::lock_guard<nano::mutex> lock{ mutex };
+	on = false;
+	for (auto & i: connections)
+	{
+		if (auto connection = i.second.lock ())
+		{
+			connection->stop ();
+		}
+	}
+	connections.clear ();
 	boost::asio::dispatch (strand, boost::asio::bind_executor (strand, [this_l = shared_from_this ()] () {
 		this_l->acceptor.close ();
 		for (auto & address_connection_pair : this_l->connections_per_address)
