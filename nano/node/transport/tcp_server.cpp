@@ -65,13 +65,11 @@ void nano::transport::tcp_listener::start (std::function<bool (std::shared_ptr<n
 
 void nano::transport::tcp_listener::stop ()
 {
-	decltype (connections) connections_l;
 	{
 		nano::lock_guard<nano::mutex> lock{ mutex };
 		on = false;
-		connections_l.swap (connections);
+		connections.clear ();
 	}
-	nano::lock_guard<nano::mutex> lock{ mutex };
 	boost::asio::dispatch (strand, boost::asio::bind_executor (strand, [this_l = shared_from_this ()] () {
 		this_l->acceptor.close ();
 		for (auto & address_connection_pair : this_l->connections_per_address)
@@ -134,6 +132,17 @@ void nano::transport::tcp_listener::on_connection (std::function<bool (std::shar
 		this_l->acceptor.async_accept (new_connection->tcp_socket, new_connection->remote,
 		boost::asio::bind_executor (this_l->strand,
 		[this_l, new_connection, cbk = std::move (callback)] (boost::system::error_code const & ec_a) mutable {
+			{
+				nano::lock_guard<nano::mutex> lock{ this_l->mutex };
+				if (!this_l->on)
+				{
+					// Check that the listener is still on, otherwise don't add to 'connections_per_address' container which is queued to be cleared
+					// 'connections_per_address' is synchronized via strand
+					// If listener is not on, do not issue another async_accept by calling on_connection.
+					new_connection->close ();
+					return;
+				}
+			}
 			this_l->evict_dead_connections ();
 
 			if (this_l->connections_per_address.size () >= this_l->max_inbound_connections)
@@ -238,12 +247,19 @@ void nano::transport::tcp_listener::evict_dead_connections ()
 	}
 }
 
-void nano::transport::tcp_listener::accept_action (boost::system::error_code const & ec, std::shared_ptr<nano::transport::socket> const & socket_a)
+bool nano::transport::tcp_listener::accept_action (boost::system::error_code const & ec, std::shared_ptr<nano::transport::socket> const & socket_a)
 {
+	nano::lock_guard<nano::mutex> lock{ mutex };
+	if (!on)
+	{
+		// Check that the listener is still on, otherwise don't add to 'connections' container which has already been cleared
+		// 'connections' is synchronized via mutex
+		socket_a->close ();
+		return false;
+	}
 	if (!node.network.excluded_peers.check (socket_a->remote_endpoint ()))
 	{
 		auto server = std::make_shared<nano::transport::tcp_server> (socket_a, node.shared (), true);
-		nano::lock_guard<nano::mutex> lock{ mutex };
 		connections[server.get ()] = server;
 		server->start ();
 	}
@@ -255,6 +271,7 @@ void nano::transport::tcp_listener::accept_action (boost::system::error_code con
 			node.logger.try_log ("Rejected connection from excluded peer ", socket_a->remote_endpoint ());
 		}
 	}
+	return true;
 }
 
 boost::asio::ip::tcp::endpoint nano::transport::tcp_listener::endpoint ()

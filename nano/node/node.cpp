@@ -644,7 +644,7 @@ void nano::node::start ()
 		tcp_listener->start ([this] (std::shared_ptr<nano::transport::socket> const & new_connection, boost::system::error_code const & ec_a) {
 			if (!ec_a)
 			{
-				tcp_listener->accept_action (ec_a, new_connection);
+				return tcp_listener->accept_action (ec_a, new_connection);
 			}
 			return true;
 		});

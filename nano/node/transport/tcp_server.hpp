@@ -25,7 +25,7 @@ public:
 	tcp_listener (uint16_t, nano::node &, std::size_t);
 	void start (std::function<bool (std::shared_ptr<nano::transport::socket> const &, boost::system::error_code const &)> callback_a);
 	void stop ();
-	void accept_action (boost::system::error_code const &, std::shared_ptr<nano::transport::socket> const &);
+	bool accept_action (boost::system::error_code const &, std::shared_ptr<nano::transport::socket> const &);
 	std::size_t connection_count ();
 
 	nano::mutex mutex;
