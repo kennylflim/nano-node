@@ -527,7 +527,7 @@ TEST (bootstrap_processor, DISABLED_push_diamond)
 	nano::test::system system;
 	nano::node_config config = system.default_config ();
 	config.frontiers_confirmation = nano::frontiers_confirmation_mode::disabled;
-	auto node0 (system.add_node (config));
+	auto node0 = system.add_node (config);
 	nano::keypair key;
 	auto node1 (std::make_shared<nano::node> (system.get_available_port (), nano::unique_path (), system.logging, system.work));
 	ASSERT_FALSE (node1->init_error ());

@@ -26,7 +26,7 @@ void nano::thread_pool::stop ()
 	if (!stopped)
 	{
 		stopped = true;
-		for (auto & timer: waiting_timers)
+		for (auto & timer : waiting_timers)
 		{
 			timer->cancel ();
 		}

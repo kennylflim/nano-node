@@ -72,7 +72,7 @@ void nano::transport::tcp_listener::stop ()
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
 	on = false;
-	for (auto & i: connections)
+	for (auto & i : connections)
 	{
 		if (auto connection = i.second.lock ())
 		{
