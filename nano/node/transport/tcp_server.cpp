@@ -42,6 +42,11 @@ nano::transport::tcp_listener::tcp_listener (uint16_t port_a, nano::node & node_
 {
 }
 
+nano::transport::tcp_listener::~tcp_listener ()
+{
+	debug_assert (connections.empty ());
+}
+
 void nano::transport::tcp_listener::start (std::function<bool (std::shared_ptr<nano::transport::socket> const &, boost::system::error_code const &)> callback_a)
 {
 	nano::lock_guard<nano::mutex> lock{ mutex };
@@ -125,6 +130,10 @@ bool nano::transport::tcp_listener::limit_reached_for_incoming_ip_connections (s
 
 void nano::transport::tcp_listener::on_connection (std::function<bool (std::shared_ptr<nano::transport::socket> const &, boost::system::error_code const &)> callback_a)
 {
+	if (!on)
+	{
+		return;
+	}
 	boost::asio::post (strand, boost::asio::bind_executor (strand, [this_l = shared_from_this (), callback = std::move (callback_a)] () mutable {
 		if (!this_l->acceptor.is_open ())
 		{
@@ -245,8 +254,13 @@ void nano::transport::tcp_listener::accept_action (boost::system::error_code con
 {
 	if (!node.network.excluded_peers.check (socket_a->remote_endpoint ()))
 	{
-		auto server = std::make_shared<nano::transport::tcp_server> (socket_a, node.shared (), true);
 		nano::lock_guard<nano::mutex> lock{ mutex };
+		if (!on)
+		{
+			socket_a->close ();
+			return;
+		}
+		auto server = std::make_shared<nano::transport::tcp_server> (socket_a, node.shared (), true);
 		connections[server.get ()] = server;
 		server->start ();
 	}

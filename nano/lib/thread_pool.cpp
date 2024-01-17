@@ -1,7 +1,6 @@
 #include <nano/lib/thread_pool.hpp>
 
 #include <boost/asio/post.hpp>
-#include <boost/asio/steady_timer.hpp>
 #include <boost/asio/thread_pool.hpp>
 
 /*
@@ -27,6 +26,10 @@ void nano::thread_pool::stop ()
 	if (!stopped)
 	{
 		stopped = true;
+		for (auto & timer: waiting_timers)
+		{
+			timer->cancel ();
+		}
 #if defined(BOOST_ASIO_HAS_IOCP)
 		// A hack needed for Windows to prevent deadlock during destruction, described here: https://github.com/chriskohlhoff/asio/issues/431
 		boost::asio::use_service<boost::asio::detail::win_iocp_io_context> (*thread_pool_m).stop ();
@@ -58,11 +61,14 @@ void nano::thread_pool::add_timed_task (std::chrono::steady_clock::time_point co
 	if (!stopped && thread_pool_m)
 	{
 		auto timer = std::make_shared<boost::asio::steady_timer> (thread_pool_m->get_executor (), expiry_time);
+		waiting_timers.insert (timer);
 		timer->async_wait ([this, task, timer] (boost::system::error_code const & ec) {
 			if (!ec)
 			{
 				push_task (task);
 			}
+			nano::lock_guard<nano::mutex> lock{ mutex };
+			waiting_timers.erase (timer);
 		});
 	}
 }

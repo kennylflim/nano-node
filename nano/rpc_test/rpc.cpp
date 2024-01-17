@@ -1677,7 +1677,7 @@ TEST (rpc, keepalive)
 {
 	nano::test::system system;
 	auto node0 = add_ipc_enabled_node (system);
-	auto node1 (std::make_shared<nano::node> (system.io_ctx, system.get_available_port (), nano::unique_path (), system.logging, system.work));
+	auto node1 (std::make_shared<nano::node> (system.get_available_port (), nano::unique_path (), system.logging, system.work));
 	node1->start ();
 	system.nodes.push_back (node1);
 	auto const rpc_ctx = add_rpc (system, node0);
@@ -1739,7 +1739,7 @@ TEST (rpc, version)
 	auto const rpc_ctx = add_rpc (system, node1);
 	boost::property_tree::ptree request1;
 	request1.put ("action", "version");
-	test_response response1 (request1, rpc_ctx.rpc->listening_port (), system.io_ctx);
+	test_response response1 (request1, rpc_ctx.rpc->listening_port ());
 	ASSERT_TIMELY (5s, response1.status != 0);
 	ASSERT_EQ (200, response1.status);
 	ASSERT_EQ ("1", response1.json.get<std::string> ("rpc_version"));
@@ -2504,7 +2504,7 @@ TEST (rpc, bootstrap)
 	request.put ("action", "bootstrap");
 	request.put ("address", "::ffff:127.0.0.1");
 	request.put ("port", node1->network.endpoint ().port ());
-	test_response response (request, rpc_ctx.rpc->listening_port (), system0.io_ctx);
+	test_response response (request, rpc_ctx.rpc->listening_port ());
 	while (response.status == 0)
 	{
 		system0.poll ();
@@ -6040,15 +6040,15 @@ TEST (rpc, simultaneous_calls)
 	// This tests simulatenous calls to the same node in different threads
 	nano::test::system system;
 	auto node = add_ipc_enabled_node (system);
-	nano::thread_runner runner (system.io_ctx, node->config.io_threads);
+	nano::thread_runner runner (node->io_ctx, node->config.io_threads);
 	nano::node_rpc_config node_rpc_config;
 	nano::ipc::ipc_server ipc_server (*node, node_rpc_config);
 	nano::rpc_config rpc_config{ nano::dev::network_params.network, system.get_available_port (), true };
 	const auto ipc_tcp_port = ipc_server.listening_tcp_port ();
 	ASSERT_TRUE (ipc_tcp_port.has_value ());
 	rpc_config.rpc_process.num_ipc_connections = 8;
-	nano::ipc_rpc_processor ipc_rpc_processor (system.io_ctx, rpc_config, ipc_tcp_port.value ());
-	nano::rpc rpc (system.io_ctx, rpc_config, ipc_rpc_processor);
+	nano::ipc_rpc_processor ipc_rpc_processor (node->io_ctx, rpc_config, ipc_tcp_port.value ());
+	nano::rpc rpc (node->io_ctx, rpc_config, ipc_rpc_processor);
 	rpc.start ();
 	boost::property_tree::ptree request;
 	request.put ("action", "account_block_count");
@@ -6058,7 +6058,7 @@ TEST (rpc, simultaneous_calls)
 	std::array<std::unique_ptr<test_response>, num> test_responses;
 	for (int i = 0; i < num; ++i)
 	{
-		test_responses[i] = std::make_unique<test_response> (request, system.io_ctx);
+		test_responses[i] = std::make_unique<test_response> (request);
 	}
 
 	std::promise<void> promise;
@@ -6088,7 +6088,7 @@ TEST (rpc, simultaneous_calls)
 	rpc.stop ();
 	system.stop ();
 	ipc_server.stop ();
-	system.io_ctx.stop ();
+	node->io_ctx.stop ();
 	runner.join ();
 }
 

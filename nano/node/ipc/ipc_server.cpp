@@ -406,6 +406,7 @@ public:
 	/** Shut down and close socket. This is also called if the timer expires. */
 	void close ()
 	{
+		socket_base::close ();
 		boost::system::error_code ec_ignored;
 		socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both, ec_ignored);
 		socket.close (ec_ignored);

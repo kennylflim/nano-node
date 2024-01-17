@@ -37,7 +37,7 @@ std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_flags node_
 /** Returns the node added. */
 std::shared_ptr<nano::node> nano::test::system::add_node (nano::node_config const & node_config_a, nano::node_flags node_flags_a, nano::transport::transport_type type_a, std::optional<nano::keypair> const & rep)
 {
-	auto node (std::make_shared<nano::node> (io_ctx, nano::unique_path (), node_config_a, work, node_flags_a, node_sequence++));
+	auto node (std::make_shared<nano::node> (nano::unique_path (), node_config_a, work, node_flags_a, node_sequence++));
 	for (auto i : initialization_blocks)
 	{
 		auto result = node->ledger.process (node->store.tx_begin_write (), *i);
@@ -269,7 +269,16 @@ void nano::test::system::deadline_set (std::chrono::duration<double, std::nano> 
 std::error_code nano::test::system::poll (std::chrono::nanoseconds const & wait_time)
 {
 #if NANO_ASIO_HANDLER_TRACKING == 0
-	io_ctx.run_one_for (wait_time);
+	std::size_t count = 0;
+	for (auto i = nodes.begin (), n = nodes.end (); i != n; ++i)
+	{
+		auto & node = **i;
+		count += node.io_ctx.poll_one ();
+	}
+	if (count == 0)
+	{
+		std::this_thread::sleep_for (std::chrono::milliseconds{ 1 });
+	}
 #else
 	nano::timer<> timer;
 	timer.start ();
@@ -315,7 +324,7 @@ void nano::test::system::delay_ms (std::chrono::milliseconds const & delay)
 	auto endtime = now + delay;
 	while (now <= endtime)
 	{
-		io_ctx.run_one_for (endtime - now);
+		poll ();
 		now = std::chrono::steady_clock::now ();
 	}
 }
@@ -596,6 +605,7 @@ uint16_t nano::test::system::get_available_port (bool can_be_zero)
 			 * This works because the kernel doesn't seem to reuse port numbers until it absolutely has to.
 			 * Subsequent binds to port 0 will allocate a different port number.
 			 */
+			boost::asio::io_context io_ctx;
 			boost::asio::ip::tcp::acceptor acceptor{ io_ctx };
 			boost::asio::ip::tcp::tcp::endpoint endpoint{ boost::asio::ip::tcp::v4 (), 0 };
 			acceptor.open (endpoint.protocol ());

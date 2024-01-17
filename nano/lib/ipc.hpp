@@ -33,7 +33,7 @@ namespace ipc
 		virtual ~socket_base () = default;
 
 		/** Close socket */
-		virtual void close () = 0;
+		virtual void close ();
 
 		/**
 		 * Start IO timer.

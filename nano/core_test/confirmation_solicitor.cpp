@@ -57,7 +57,6 @@ TEST (confirmation_solicitor, batches)
 	solicitor.flush ();
 	ASSERT_EQ (1, node2.stats.count (nano::stat::type::message, nano::stat::detail::confirm_req, nano::stat::dir::out));
 }
-
 namespace nano
 {
 TEST (confirmation_solicitor, different_hash)

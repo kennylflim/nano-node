@@ -8,17 +8,27 @@
 
 #include <boost/property_tree/json_parser.hpp>
 
-nano::test::test_response::test_response (boost::property_tree::ptree const & request_a, boost::asio::io_context & io_ctx_a) :
+nano::test::test_response::test_response (boost::property_tree::ptree const & request_a) :
 	request (request_a),
-	sock (io_ctx_a)
+	sock (io_ctx),
+	threads{ io_ctx, 1 }
 {
 }
 
-nano::test::test_response::test_response (boost::property_tree::ptree const & request_a, uint16_t port_a, boost::asio::io_context & io_ctx_a) :
+nano::test::test_response::test_response (boost::property_tree::ptree const & request_a, uint16_t port_a) :
 	request (request_a),
-	sock (io_ctx_a)
+	sock (io_ctx),
+	threads{ io_ctx, 1 }
 {
 	run (port_a);
+}
+
+nano::test::test_response::~test_response ()
+{
+	sock.close ();
+	threads.stop_event_processing ();
+	threads.join ();
+	io_ctx.run_for (10s);
 }
 
 void nano::test::test_response::run (uint16_t port_a)

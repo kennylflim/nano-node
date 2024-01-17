@@ -384,6 +384,7 @@ TEST (telemetry, dos_tcp)
 	ASSERT_EQ (1, node_server->stats.count (nano::stat::type::message, nano::stat::detail::telemetry_req, nano::stat::dir::in));
 
 	// Now spam messages waiting for it to be processed
+	system.deadline_set (10s);
 	while (node_server->stats.count (nano::stat::type::message, nano::stat::detail::telemetry_req, nano::stat::dir::in) == 1)
 	{
 		channel->send (message);

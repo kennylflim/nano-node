@@ -1,9 +1,16 @@
 #include <nano/lib/ipc.hpp>
 #include <nano/lib/utility.hpp>
 
+#include <iostream>
+
 nano::ipc::socket_base::socket_base (boost::asio::io_context & io_ctx_a) :
 	io_timer (io_ctx_a)
 {
+}
+
+void nano::ipc::socket_base::close ()
+{
+	io_timer.cancel ();
 }
 
 void nano::ipc::socket_base::timer_start (std::chrono::seconds timeout_a)

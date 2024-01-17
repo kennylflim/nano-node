@@ -161,6 +161,7 @@ public:
 	/** Shut down and close socket */
 	void close () override
 	{
+		socket_base::close ();
 		auto this_l (this->shared_from_this ());
 		boost::asio::post (strand, boost::asio::bind_executor (strand, [this_l] () {
 			this_l->socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both);

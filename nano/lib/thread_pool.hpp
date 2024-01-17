@@ -4,10 +4,13 @@
 #include <nano/lib/thread_roles.hpp>
 #include <nano/lib/threading.hpp>
 
+#include <boost/asio/steady_timer.hpp>
+
 #include <atomic>
 #include <chrono>
 #include <functional>
 #include <latch>
+#include <unordered_set>
 
 namespace boost::asio
 {
@@ -43,6 +46,7 @@ private:
 	unsigned num_threads;
 	std::unique_ptr<boost::asio::thread_pool> thread_pool_m;
 	nano::relaxed_atomic_integral<uint64_t> num_tasks{ 0 };
+	std::unordered_set<std::shared_ptr<boost::asio::steady_timer>> waiting_timers;
 
 	/** Set the names of all the threads in the thread pool for easier identification */
 	std::latch thread_names_latch;

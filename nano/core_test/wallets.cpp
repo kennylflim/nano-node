@@ -10,6 +10,7 @@ TEST (wallets, open_create)
 {
 	nano::test::system system (1);
 	bool error (false);
+	// Wallet doesn't survive node lifetime
 	nano::wallets wallets (error, *system.nodes[0]);
 	ASSERT_FALSE (error);
 	ASSERT_EQ (1, wallets.items.size ()); // it starts out with a default wallet
