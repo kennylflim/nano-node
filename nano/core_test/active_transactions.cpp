@@ -255,7 +255,6 @@ TEST (active_transactions, inactive_votes_cache)
 	node.vote_processor.vote (vote, std::make_shared<nano::transport::inproc::channel> (node, node));
 	ASSERT_TIMELY_EQ (5s, node.vote_cache.size (), 1);
 	node.process_active (send);
-	node.block_processor.flush ();
 	ASSERT_TIMELY (5s, node.ledger.block_confirmed (node.store.tx_begin_read (), send->hash ()));
 	ASSERT_EQ (1, node.stats.count (nano::stat::type::election, nano::stat::detail::vote_cached));
 }
@@ -356,7 +355,6 @@ TEST (active_transactions, inactive_votes_cache_existing_vote)
 				.build_shared ();
 	node.process_active (send);
 	node.block_processor.add (open);
-	node.block_processor.flush ();
 	ASSERT_TIMELY_EQ (5s, node.active.size (), 1);
 	auto election (node.active.election (send->qualified_root ()));
 	ASSERT_NE (nullptr, election);
@@ -714,7 +712,6 @@ TEST (active_transactions, republish_winner)
 				 .build_shared ();
 
 	node1.process_active (send1);
-	node1.block_processor.flush ();
 	ASSERT_TIMELY_EQ (3s, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::in), 1);
 
 	// Several forks
@@ -731,7 +728,6 @@ TEST (active_transactions, republish_winner)
 					.build_shared ();
 		node1.process_active (fork);
 	}
-	node1.block_processor.flush ();
 	ASSERT_TIMELY (3s, !node1.active.empty ());
 	ASSERT_EQ (1, node2.stats.count (nano::stat::type::message, nano::stat::detail::publish, nano::stat::dir::in));
 
@@ -753,7 +749,6 @@ TEST (active_transactions, republish_winner)
 	auto vote = std::make_shared<nano::vote> (nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, nano::vote::timestamp_max, nano::vote::duration_max, std::vector<nano::block_hash>{ fork->hash () });
 	node1.vote_processor.vote (vote, std::make_shared<nano::transport::inproc::channel> (node1, node1));
 	node1.vote_processor.flush ();
-	node1.block_processor.flush ();
 	ASSERT_TIMELY (5s, election->confirmed ());
 	ASSERT_EQ (fork->hash (), election->status.winner->hash ());
 	ASSERT_TIMELY (5s, node2.block_confirmed (fork->hash ()));
@@ -1044,7 +1039,6 @@ TEST (active_transactions, DISABLED_confirm_new)
 				.work (*system.work.generate (nano::dev::genesis->hash ()))
 				.build_shared ();
 	node1.process_active (send);
-	node1.block_processor.flush ();
 	ASSERT_TIMELY_EQ (5s, 1, node1.active.size ());
 	auto & node2 = *system.add_node ();
 	// Add key to node2

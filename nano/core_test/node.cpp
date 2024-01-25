@@ -580,7 +580,6 @@ TEST (node, fork_publish)
 					 .build_shared ();
 		node1.work_generate_blocking (*send2);
 		node1.process_active (send1);
-		node1.block_processor.flush ();
 		ASSERT_TIMELY_EQ (5s, 1, node1.active.size ());
 		auto election (node1.active.election (send1->qualified_root ()));
 		ASSERT_NE (nullptr, election);
@@ -678,9 +677,7 @@ TEST (node, fork_keep)
 				 .work (*system.work.generate (nano::dev::genesis->hash ()))
 				 .build_shared ();
 	node1.process_active (send1);
-	node1.block_processor.flush ();
 	node2.process_active (send1);
-	node2.block_processor.flush ();
 	ASSERT_TIMELY_EQ (5s, 1, node1.active.size ());
 	ASSERT_TIMELY_EQ (5s, 1, node2.active.size ());
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -733,9 +730,7 @@ TEST (node, fork_flip)
 	auto ignored_channel{ std::make_shared<nano::transport::channel_tcp> (node1, std::weak_ptr<nano::transport::socket> ()) };
 
 	node1.network.inbound (publish1, ignored_channel);
-	node1.block_processor.flush ();
 	node2.network.inbound (publish2, ignored_channel);
-	node2.block_processor.flush ();
 	ASSERT_TIMELY_EQ (5s, 1, node1.active.size ());
 	ASSERT_TIMELY_EQ (5s, 1, node2.active.size ());
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -800,8 +795,6 @@ TEST (node, fork_multi_flip)
 	node1.network.inbound (publish1, channel1);
 	node2.network.inbound (publish2, channel2);
 	node2.network.inbound (publish3, channel2);
-	node1.block_processor.flush ();
-	node2.block_processor.flush ();
 	ASSERT_TIMELY_EQ (5s, 1, node1.active.size ());
 	ASSERT_TIMELY_EQ (5s, 1, node2.active.size ());
 	system.wallet (0)->insert_adhoc (nano::dev::genesis_key.prv);
@@ -810,7 +803,6 @@ TEST (node, fork_multi_flip)
 	node1.network.inbound (publish3, channel1);
 	node1.block_processor.flush ();
 	node2.network.inbound (publish1, channel2);
-	node2.block_processor.flush ();
 	ASSERT_TIMELY (5s, node2.active.election (nano::qualified_root (nano::dev::genesis->hash (), nano::dev::genesis->hash ())));
 	auto election1 (node2.active.election (nano::qualified_root (nano::dev::genesis->hash (), nano::dev::genesis->hash ())));
 	ASSERT_NE (nullptr, election1);
@@ -2106,7 +2098,6 @@ TEST (node, online_reps_election)
 				 .work (*node1.work_generate_blocking (nano::dev::genesis->hash ()))
 				 .build_shared ();
 	node1.process_active (send1);
-	node1.block_processor.flush ();
 	ASSERT_TIMELY_EQ (5s, 1, node1.active.size ());
 	// Process vote for ongoing election
 	auto vote = std::make_shared<nano::vote> (nano::dev::genesis_key.pub, nano::dev::genesis_key.prv, nano::milliseconds_since_epoch (), 0, std::vector<nano::block_hash>{ send1->hash () });
@@ -2476,7 +2467,6 @@ TEST (node, local_votes_cache_fork)
 	node_config.peering_port = system.get_available_port ();
 	auto & node2 (*system.add_node (node_config, node_flags));
 	node2.process_active (send1_fork);
-	node2.block_processor.flush ();
 	ASSERT_TIMELY (5s, node2.ledger.block_or_pruned_exists (send1->hash ()));
 }
 
@@ -3360,7 +3350,6 @@ TEST (node, bidirectional_tcp)
 				 .work (*node1->work_generate_blocking (send1->hash ()))
 				 .build_shared ();
 	node2->process_active (send2);
-	node2->block_processor.flush ();
 	ASSERT_TIMELY (10s, node1->ledger.block_or_pruned_exists (send2->hash ()) && node2->ledger.block_or_pruned_exists (send2->hash ()));
 	// Test block confirmation from node 2 (add representative to node 2)
 	system.wallet (1)->insert_adhoc (nano::dev::genesis_key.prv);
