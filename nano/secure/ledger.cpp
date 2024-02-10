@@ -11,7 +11,6 @@
 #include <nano/store/component.hpp>
 #include <nano/store/confirmation_height.hpp>
 #include <nano/store/final.hpp>
-#include <nano/store/frontier.hpp>
 #include <nano/store/online_weight.hpp>
 #include <nano/store/peer.hpp>
 #include <nano/store/pending.hpp>
@@ -53,8 +52,6 @@ public:
 			nano::account_info new_info (block_a.hashables.previous, info->representative, info->open_block, ledger.balance (transaction, block_a.hashables.previous), nano::seconds_since_epoch (), info->block_count - 1, nano::epoch::epoch_0);
 			ledger.update_account (transaction, pending.source, *info, new_info);
 			ledger.store.block.del (transaction, hash);
-			ledger.store.frontier.del (transaction, hash);
-			ledger.store.frontier.put (transaction, block_a.hashables.previous, pending.source);
 			ledger.store.block.successor_clear (transaction, block_a.hashables.previous);
 			ledger.stats.inc (nano::stat::type::rollback, nano::stat::detail::send);
 		}
@@ -74,8 +71,6 @@ public:
 		ledger.update_account (transaction, destination_account, *info, new_info);
 		ledger.store.block.del (transaction, hash);
 		ledger.store.pending.put (transaction, nano::pending_key (destination_account, block_a.hashables.source), { source_account, amount, nano::epoch::epoch_0 });
-		ledger.store.frontier.del (transaction, hash);
-		ledger.store.frontier.put (transaction, block_a.hashables.previous, destination_account);
 		ledger.store.block.successor_clear (transaction, block_a.hashables.previous);
 		ledger.stats.inc (nano::stat::type::rollback, nano::stat::detail::receive);
 	}
@@ -92,7 +87,6 @@ public:
 		ledger.update_account (transaction, destination_account, new_info, new_info);
 		ledger.store.block.del (transaction, hash);
 		ledger.store.pending.put (transaction, nano::pending_key (destination_account, block_a.hashables.source), { source_account, amount, nano::epoch::epoch_0 });
-		ledger.store.frontier.del (transaction, hash);
 		ledger.stats.inc (nano::stat::type::rollback, nano::stat::detail::open);
 	}
 	void change_block (nano::change_block const & block_a) override
@@ -110,8 +104,6 @@ public:
 		ledger.store.block.del (transaction, hash);
 		nano::account_info new_info (block_a.hashables.previous, representative, info->open_block, info->balance, nano::seconds_since_epoch (), info->block_count - 1, nano::epoch::epoch_0);
 		ledger.update_account (transaction, account, *info, new_info);
-		ledger.store.frontier.del (transaction, hash);
-		ledger.store.frontier.put (transaction, block_a.hashables.previous, account);
 		ledger.store.block.successor_clear (transaction, block_a.hashables.previous);
 		ledger.stats.inc (nano::stat::type::rollback, nano::stat::detail::change);
 	}
@@ -172,10 +164,6 @@ public:
 		if (previous != nullptr)
 		{
 			ledger.store.block.successor_clear (transaction, block_a.hashables.previous);
-			if (previous->type () < nano::block_type::state)
-			{
-				ledger.store.frontier.put (transaction, block_a.hashables.previous, block_a.hashables.account);
-			}
 		}
 		else
 		{
@@ -369,10 +357,6 @@ void ledger_processor::state_block_impl (nano::state_block & block_a)
 
 						nano::account_info new_info (hash, block_a.representative (), info.open_block.is_zero () ? hash : info.open_block, block_a.hashables.balance, nano::seconds_since_epoch (), info.block_count + 1, epoch);
 						ledger.update_account (transaction, block_a.hashables.account, info, new_info);
-						if (!ledger.store.frontier.get (transaction, info.head).is_zero ())
-						{
-							ledger.store.frontier.del (transaction, info.head);
-						}
 					}
 				}
 			}
@@ -439,10 +423,6 @@ void ledger_processor::epoch_block_impl (nano::state_block & block_a)
 								ledger.store.block.put (transaction, hash, block_a);
 								nano::account_info new_info (hash, block_a.representative (), info.open_block.is_zero () ? hash : info.open_block, info.balance, nano::seconds_since_epoch (), info.block_count + 1, epoch);
 								ledger.update_account (transaction, block_a.hashables.account, info, new_info);
-								if (!ledger.store.frontier.get (transaction, info.head).is_zero ())
-								{
-									ledger.store.frontier.del (transaction, info.head);
-								}
 							}
 						}
 					}
@@ -466,12 +446,12 @@ void ledger_processor::change_block (nano::change_block & block_a)
 			result.code = block_a.valid_predecessor (*previous) ? nano::process_result::progress : nano::process_result::block_position;
 			if (result.code == nano::process_result::progress)
 			{
-				auto account (ledger.store.frontier.get (transaction, block_a.hashables.previous));
-				result.code = account.is_zero () ? nano::process_result::fork : nano::process_result::progress;
+				auto account = ledger.account (*previous);
+				auto info = ledger.account_info (transaction, account);
+				debug_assert (info);
+				result.code = info->head != block_a.hashables.previous ? nano::process_result::fork : nano::process_result::progress;
 				if (result.code == nano::process_result::progress)
 				{
-					auto info = ledger.account_info (transaction, account);
-					debug_assert (info);
 					debug_assert (info->head == block_a.hashables.previous);
 					result.code = validate_message (account, hash, block_a.signature) ? nano::process_result::bad_signature : nano::process_result::progress; // Is this block signed correctly (Malformed)
 					if (result.code == nano::process_result::progress)
@@ -487,8 +467,6 @@ void ledger_processor::change_block (nano::change_block & block_a)
 							ledger.cache.rep_weights.representation_add_dual (block_a.representative (), balance, info->representative, 0 - balance);
 							nano::account_info new_info (hash, block_a.representative (), info->open_block, info->balance, nano::seconds_since_epoch (), info->block_count + 1, nano::epoch::epoch_0);
 							ledger.update_account (transaction, account, *info, new_info);
-							ledger.store.frontier.del (transaction, block_a.hashables.previous);
-							ledger.store.frontier.put (transaction, hash, account);
 							ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::change);
 						}
 					}
@@ -512,8 +490,10 @@ void ledger_processor::send_block (nano::send_block & block_a)
 			result.code = block_a.valid_predecessor (*previous) ? nano::process_result::progress : nano::process_result::block_position;
 			if (result.code == nano::process_result::progress)
 			{
-				auto account (ledger.store.frontier.get (transaction, block_a.hashables.previous));
-				result.code = account.is_zero () ? nano::process_result::fork : nano::process_result::progress;
+				auto account = ledger.account (*previous);
+				auto info = ledger.account_info (transaction, account);
+				debug_assert (info);
+				result.code = info->head != block_a.hashables.previous ? nano::process_result::fork : nano::process_result::progress;
 				if (result.code == nano::process_result::progress)
 				{
 					result.code = validate_message (account, hash, block_a.signature) ? nano::process_result::bad_signature : nano::process_result::progress; // Is this block signed correctly (Malformed)
@@ -524,8 +504,6 @@ void ledger_processor::send_block (nano::send_block & block_a)
 						if (result.code == nano::process_result::progress)
 						{
 							debug_assert (!validate_message (account, hash, block_a.signature));
-							auto info = ledger.account_info (transaction, account);
-							debug_assert (info);
 							debug_assert (info->head == block_a.hashables.previous);
 							result.code = info->balance.number () >= block_a.hashables.balance.number () ? nano::process_result::progress : nano::process_result::negative_spend; // Is this trying to spend a negative amount (Malicious)
 							if (result.code == nano::process_result::progress)
@@ -537,8 +515,6 @@ void ledger_processor::send_block (nano::send_block & block_a)
 								nano::account_info new_info (hash, info->representative, info->open_block, block_a.hashables.balance, nano::seconds_since_epoch (), info->block_count + 1, nano::epoch::epoch_0);
 								ledger.update_account (transaction, account, *info, new_info);
 								ledger.store.pending.put (transaction, nano::pending_key (block_a.hashables.destination, hash), { account, amount, nano::epoch::epoch_0 });
-								ledger.store.frontier.del (transaction, block_a.hashables.previous);
-								ledger.store.frontier.put (transaction, hash, account);
 								ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::send);
 							}
 						}
@@ -563,8 +539,10 @@ void ledger_processor::receive_block (nano::receive_block & block_a)
 			result.code = block_a.valid_predecessor (*previous) ? nano::process_result::progress : nano::process_result::block_position;
 			if (result.code == nano::process_result::progress)
 			{
-				auto account (ledger.store.frontier.get (transaction, block_a.hashables.previous));
-				result.code = account.is_zero () ? nano::process_result::gap_previous : nano::process_result::progress; // Have we seen the previous block? No entries for account at all (Harmless)
+				auto account = ledger.account (*previous);
+				auto info = ledger.account_info (transaction, account);
+				debug_assert (info);
+				result.code = info->head != block_a.hashables.previous ? nano::process_result::gap_previous : nano::process_result::progress; // Have we seen the previous block? No entries for account at all (Harmless)
 				if (result.code == nano::process_result::progress)
 				{
 					result.code = validate_message (account, hash, block_a.signature) ? nano::process_result::bad_signature : nano::process_result::progress; // Is the signature valid (Malformed)
@@ -574,8 +552,6 @@ void ledger_processor::receive_block (nano::receive_block & block_a)
 						result.code = ledger.block_or_pruned_exists (transaction, block_a.hashables.source) ? nano::process_result::progress : nano::process_result::gap_source; // Have we seen the source block already? (Harmless)
 						if (result.code == nano::process_result::progress)
 						{
-							auto info = ledger.account_info (transaction, account);
-							debug_assert (info);
 							result.code = info->head == block_a.hashables.previous ? nano::process_result::progress : nano::process_result::gap_previous; // Block doesn't immediately follow latest block (Harmless)
 							if (result.code == nano::process_result::progress)
 							{
@@ -605,8 +581,6 @@ void ledger_processor::receive_block (nano::receive_block & block_a)
 											nano::account_info new_info (hash, info->representative, info->open_block, new_balance, nano::seconds_since_epoch (), info->block_count + 1, nano::epoch::epoch_0);
 											ledger.update_account (transaction, account, *info, new_info);
 											ledger.cache.rep_weights.representation_add (info->representative, pending.amount.number ());
-											ledger.store.frontier.del (transaction, block_a.hashables.previous);
-											ledger.store.frontier.put (transaction, hash, account);
 											ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::receive);
 										}
 									}
@@ -671,7 +645,6 @@ void ledger_processor::open_block (nano::open_block & block_a)
 									nano::account_info new_info (hash, block_a.representative (), hash, pending.amount.number (), nano::seconds_since_epoch (), 1, nano::epoch::epoch_0);
 									ledger.update_account (transaction, block_a.hashables.account, info, new_info);
 									ledger.cache.rep_weights.representation_add (block_a.representative (), pending.amount.number ());
-									ledger.store.frontier.put (transaction, hash, block_a.hashables.account);
 									ledger.stats.inc (nano::stat::type::ledger, nano::stat::detail::open);
 								}
 							}
@@ -1609,15 +1582,6 @@ bool nano::ledger::migrate_lmdb_to_rocksdb (std::filesystem::path const & data_p
 			{
 				auto rocksdb_transaction (rocksdb_store->tx_begin_write ({}, { nano::tables::accounts }));
 				rocksdb_store->account.put (rocksdb_transaction, i->first, i->second);
-			}
-		});
-
-		store.frontier.for_each_par (
-		[&rocksdb_store] (store::read_transaction const & /*unused*/, auto i, auto n) {
-			for (; i != n; ++i)
-			{
-				auto rocksdb_transaction (rocksdb_store->tx_begin_write ({}, { nano::tables::frontiers }));
-				rocksdb_store->frontier.put (rocksdb_transaction, i->first, i->second);
 			}
 		});
 
