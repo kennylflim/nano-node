@@ -21,7 +21,6 @@ namespace store
 	class block;
 	class confirmation_height;
 	class final_vote;
-	class frontier;
 	class online_weight;
 	class peer;
 	class pending;
@@ -44,7 +43,6 @@ namespace store
 		// clang-format off
 	explicit component (
 		nano::store::block &,
-		nano::store::frontier &,
 		nano::store::account &,
 		nano::store::pending &,
 		nano::store::online_weight&,
@@ -65,11 +63,10 @@ namespace store
 		virtual std::string error_string (int status) const = 0;
 
 		store::block & block;
-		store::frontier & frontier;
 		store::account & account;
 		store::pending & pending;
 		static int constexpr version_minimum{ 21 };
-		static int constexpr version_current{ 22 };
+		static int constexpr version_current{ 23 };
 
 	public:
 		store::online_weight & online_weight;
