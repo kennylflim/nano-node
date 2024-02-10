@@ -3,11 +3,9 @@
 #include <nano/store/block.hpp>
 #include <nano/store/component.hpp>
 #include <nano/store/confirmation_height.hpp>
-#include <nano/store/frontier.hpp>
 
-nano::store::component::component (nano::store::block & block_store_a, nano::store::frontier & frontier_store_a, nano::store::account & account_store_a, nano::store::pending & pending_store_a, nano::store::online_weight & online_weight_store_a, nano::store::pruned & pruned_store_a, nano::store::peer & peer_store_a, nano::store::confirmation_height & confirmation_height_store_a, nano::store::final_vote & final_vote_store_a, nano::store::version & version_store_a) :
+nano::store::component::component (nano::store::block & block_store_a, nano::store::account & account_store_a, nano::store::pending & pending_store_a, nano::store::online_weight & online_weight_store_a, nano::store::pruned & pruned_store_a, nano::store::peer & peer_store_a, nano::store::confirmation_height & confirmation_height_store_a, nano::store::final_vote & final_vote_store_a, nano::store::version & version_store_a) :
 	block (block_store_a),
-	frontier (frontier_store_a),
 	account (account_store_a),
 	pending (pending_store_a),
 	online_weight (online_weight_store_a),
@@ -36,5 +34,4 @@ void nano::store::component::initialize (store::write_transaction const & transa
 	account.put (transaction_a, constants.genesis->account (), { hash_l, constants.genesis->account (), constants.genesis->hash (), std::numeric_limits<nano::uint128_t>::max (), nano::seconds_since_epoch (), 1, nano::epoch::epoch_0 });
 	++ledger_cache_a.account_count;
 	ledger_cache_a.rep_weights.representation_put (constants.genesis->account (), std::numeric_limits<nano::uint128_t>::max ());
-	frontier.put (transaction_a, hash_l, constants.genesis->account ());
 }
