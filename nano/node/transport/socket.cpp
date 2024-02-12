@@ -22,7 +22,7 @@
 nano::transport::socket::socket (nano::node & node_a, endpoint_type_t endpoint_type_a, std::size_t max_queue_size_a) :
 	send_queue{ max_queue_size_a },
 	strand{ node_a.io_ctx.get_executor () },
-	tcp_socket{ node_a.io_ctx },
+	tcp_socket{ strand },
 	node{ node_a },
 	endpoint_type_m{ endpoint_type_a },
 	timeout{ std::numeric_limits<uint64_t>::max () },
