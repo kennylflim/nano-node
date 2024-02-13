@@ -41,6 +41,7 @@ private:
 	nano::transport::address_socket_mmap connections_per_address;
 	boost::asio::ip::tcp::acceptor acceptor;
 	boost::asio::ip::tcp::endpoint local;
+	std::shared_ptr<nano::transport::socket> listening;
 	std::size_t max_inbound_connections;
 	void on_connection (std::function<bool (std::shared_ptr<nano::transport::socket> const &, boost::system::error_code const &)> callback_a);
 	void evict_dead_connections ();

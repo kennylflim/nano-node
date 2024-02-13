@@ -81,6 +81,11 @@ void nano::transport::tcp_listener::stop ()
 				connection_l->close ();
 			}
 		}
+		if (this_l->listening)
+		{
+			this_l->listening->close ();
+			this_l->listening = nullptr;
+		}
 		this_l->connections_per_address.clear ();
 	}));
 }
@@ -130,10 +135,10 @@ void nano::transport::tcp_listener::on_connection (std::function<bool (std::shar
 		}
 
 		// Prepare new connection
-		auto new_connection = std::make_shared<nano::transport::socket> (this_l->node, socket::endpoint_type_t::server);
-		this_l->acceptor.async_accept (new_connection->tcp_socket, new_connection->remote,
+		this_l->listening = std::make_shared<nano::transport::socket> (this_l->node, socket::endpoint_type_t::server);
+		this_l->acceptor.async_accept (this_l->listening->tcp_socket, this_l->listening->remote,
 		boost::asio::bind_executor (this_l->strand,
-		[this_l, new_connection, cbk = std::move (callback)] (boost::system::error_code const & ec_a) mutable {
+		[this_l, new_connection = this_l->listening, cbk = std::move (callback)] (boost::system::error_code const & ec_a) mutable {
 			this_l->evict_dead_connections ();
 
 			if (this_l->connections_per_address.size () >= this_l->max_inbound_connections)
