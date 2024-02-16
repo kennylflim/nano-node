@@ -2327,17 +2327,17 @@ TEST (ledger, block_destination_source)
 	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, *block5).code);
 	ASSERT_EQ (nano::process_result::progress, ledger.process (transaction, *block6).code);
 	ASSERT_EQ (balance, ledger.balance (transaction, block6->hash ()));
-	ASSERT_EQ (dest.pub, ledger.block_destination (transaction, *block1));
+	ASSERT_EQ (dest.pub, ledger.destination (*block1).value ());
 	ASSERT_TRUE (ledger.block_source (transaction, *block1).is_zero ());
-	ASSERT_EQ (nano::dev::genesis->account (), ledger.block_destination (transaction, *block2));
+	ASSERT_EQ (nano::dev::genesis->account (), ledger.destination (*block2).value ());
 	ASSERT_TRUE (ledger.block_source (transaction, *block2).is_zero ());
-	ASSERT_EQ (ledger.block_destination (transaction, *block3), nullptr);
+	ASSERT_FALSE (ledger.destination (*block3));
 	ASSERT_EQ (block2->hash (), ledger.block_source (transaction, *block3));
-	ASSERT_EQ (dest.pub, ledger.block_destination (transaction, *block4));
+	ASSERT_EQ (dest.pub, ledger.destination (*block4).value ());
 	ASSERT_TRUE (ledger.block_source (transaction, *block4).is_zero ());
-	ASSERT_EQ (nano::dev::genesis->account (), ledger.block_destination (transaction, *block5));
+	ASSERT_EQ (nano::dev::genesis->account (), ledger.destination (*block5).value ());
 	ASSERT_TRUE (ledger.block_source (transaction, *block5).is_zero ());
-	ASSERT_EQ (ledger.block_destination (transaction, *block6), nullptr);
+	ASSERT_FALSE (ledger.destination (*block6));
 	ASSERT_EQ (block5->hash (), ledger.block_source (transaction, *block6));
 }
 

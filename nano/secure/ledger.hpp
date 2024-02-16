@@ -68,7 +68,7 @@ public:
 	std::string block_text (char const *);
 	std::string block_text (nano::block_hash const &);
 	bool is_send (store::transaction const &, nano::block const &) const;
-	nano::account const & block_destination (store::transaction const &, nano::block const &);
+	std::optional<nano::account> destination (nano::block const &);
 	nano::block_hash block_source (store::transaction const &, nano::block const &);
 	std::pair<nano::block_hash, nano::block_hash> hash_root_random (store::transaction const &) const;
 	std::optional<nano::pending_info> pending_info (store::transaction const & transaction, nano::pending_key const & key) const;

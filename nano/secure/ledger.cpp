@@ -1009,20 +1009,21 @@ bool nano::ledger::is_send (store::transaction const & transaction_a, nano::bloc
 	return result;
 }
 
-nano::account const & nano::ledger::block_destination (store::transaction const & transaction_a, nano::block const & block_a)
+std::optional<nano::account> nano::ledger::destination (nano::block const & block_a)
 {
-	nano::send_block const * send_block (dynamic_cast<nano::send_block const *> (&block_a));
-	nano::state_block const * state_block (dynamic_cast<nano::state_block const *> (&block_a));
-	if (send_block != nullptr)
+	switch (block_a.type ())
 	{
-		return send_block->hashables.destination;
+		case nano::block_type::send:
+			return block_a.destination ();
+		case nano::block_type::state:
+			if (block_a.sideband ().details.is_send)
+			{
+				return block_a.link ().as_account ();
+			}
+			[[fallthrough]];
+		default:
+			return std::nullopt;
 	}
-	else if (state_block != nullptr && is_send (transaction_a, *state_block))
-	{
-		return state_block->hashables.link.as_account ();
-	}
-
-	return nano::account::null ();
 }
 
 nano::block_hash nano::ledger::block_source (store::transaction const & transaction_a, nano::block const & block_a)

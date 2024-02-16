@@ -2302,10 +2302,10 @@ void nano_qt::block_creation::create_receive ()
 		auto block_l (wallet.node.store.block.get (block_transaction, source_l));
 		if (block_l != nullptr)
 		{
-			auto const & destination (wallet.node.ledger.block_destination (block_transaction, *block_l));
-			if (!destination.is_zero ())
+			auto destination (wallet.node.ledger.destination (*block_l));
+			if (destination)
 			{
-				nano::pending_key pending_key (destination, source_l);
+				nano::pending_key pending_key (*destination, source_l);
 				nano::pending_info pending;
 				if (!wallet.node.store.pending.get (block_transaction, pending_key, pending))
 				{
@@ -2467,10 +2467,10 @@ void nano_qt::block_creation::create_open ()
 			auto block_l (wallet.node.store.block.get (block_transaction, source_l));
 			if (block_l != nullptr)
 			{
-				auto const & destination (wallet.node.ledger.block_destination (block_transaction, *block_l));
-				if (!destination.is_zero ())
+				auto destination (wallet.node.ledger.destination (*block_l));
+				if (destination)
 				{
-					nano::pending_key pending_key (destination, source_l);
+					nano::pending_key pending_key (*destination, source_l);
 					nano::pending_info pending;
 					if (!wallet.node.store.pending.get (block_transaction, pending_key, pending))
 					{

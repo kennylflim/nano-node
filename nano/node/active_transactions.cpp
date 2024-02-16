@@ -209,12 +209,12 @@ void nano::active_transactions::handle_final_votes_confirmation (std::shared_ptr
 void nano::active_transactions::activate_successors (const nano::account & account, std::shared_ptr<nano::block> const & block, nano::store::read_transaction const & transaction)
 {
 	node.scheduler.priority.activate (account, transaction);
-	auto const & destination = node.ledger.block_destination (transaction, *block);
+	auto destination = node.ledger.destination (*block);
 
 	// Start or vote for the next unconfirmed block in the destination account
-	if (!destination.is_zero () && destination != account)
+	if (destination && !destination->is_zero () && destination != account)
 	{
-		node.scheduler.priority.activate (destination, transaction);
+		node.scheduler.priority.activate (*destination, transaction);
 	}
 }
 

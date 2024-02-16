@@ -1342,8 +1342,8 @@ void nano::json_handler::blocks_info ()
 					}
 					if (receivable || receive_hash)
 					{
-						auto destination (node.ledger.block_destination (transaction, *block));
-						if (destination.is_zero ())
+						auto destination (node.ledger.destination (*block));
+						if (!destination)
 						{
 							if (receivable)
 							{
@@ -1355,7 +1355,7 @@ void nano::json_handler::blocks_info ()
 								entry.put ("receive_hash", nano::block_hash (0).to_string ());
 							}
 						}
-						else if (node.store.pending.exists (transaction, nano::pending_key (destination, hash)))
+						else if (node.store.pending.exists (transaction, nano::pending_key (*destination, hash)))
 						{
 							if (receivable)
 							{
@@ -1376,7 +1376,7 @@ void nano::json_handler::blocks_info ()
 							}
 							if (receive_hash)
 							{
-								std::shared_ptr<nano::block> receive_block = node.ledger.find_receive_block_by_send_hash (transaction, destination, hash);
+								std::shared_ptr<nano::block> receive_block = node.ledger.find_receive_block_by_send_hash (transaction, *destination, hash);
 								std::string receive_hash = receive_block ? receive_block->hash ().to_string () : nano::block_hash (0).to_string ();
 								entry.put ("receive_hash", receive_hash);
 							}
@@ -3168,10 +3168,10 @@ void nano::json_handler::receivable_exists ()
 		if (block != nullptr)
 		{
 			auto exists (false);
-			auto destination (node.ledger.block_destination (transaction, *block));
-			if (!destination.is_zero ())
+			auto destination (node.ledger.destination (*block));
+			if (destination)
 			{
-				exists = node.store.pending.exists (transaction, nano::pending_key (destination, hash));
+				exists = node.store.pending.exists (transaction, nano::pending_key (*destination, hash));
 			}
 			exists = exists && (block_confirmed (node, transaction, block->hash (), include_active, include_only_confirmed));
 			response_l.put ("exists", exists ? "1" : "0");
@@ -3673,12 +3673,12 @@ void nano::json_handler::republish ()
 				if (destinations != 0) // Republish destination chain
 				{
 					auto block_b (node.store.block.get (transaction, hash));
-					auto destination (node.ledger.block_destination (transaction, *block_b));
-					if (!destination.is_zero ())
+					auto destination = node.ledger.destination (*block_b);
+					if (destination && !destination->is_zero ())
 					{
-						if (!node.store.pending.exists (transaction, nano::pending_key (destination, hash)))
+						if (!node.store.pending.exists (transaction, nano::pending_key (*destination, hash)))
 						{
-							nano::block_hash previous (node.ledger.latest (transaction, destination));
+							nano::block_hash previous (node.ledger.latest (transaction, *destination));
 							auto block_d (node.store.block.get (transaction, previous));
 							nano::block_hash source;
 							std::vector<nano::block_hash> hashes;
